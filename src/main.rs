@@ -1,9 +1,10 @@
-use bio::io::fasta::Reader;
 use bio::alphabets;
+use bio::io::fasta::Reader;
+use roaring::RoaringTreemap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::str;
-use roaring::RoaringTreemap;
+use std::time::Instant;
+use std::{str, time};
 
 fn filter_n(seq: &&[u8]) -> bool {
     for l in seq.iter() {
@@ -43,11 +44,17 @@ fn main() {
 
     while let Some(Ok(record)) = records.next() {
         println!("inserting sequences from {}", record.id());
-        let i = record.seq().windows(seq_width).filter(filter_n).map(seq_to_bits);
+        let i = record
+            .seq()
+            .windows(seq_width)
+            .filter(filter_n)
+            .map(seq_to_bits);
+        let mut last = Instant::now();
         for (idx, elem) in i.enumerate() {
             bm.insert(elem);
-            if idx%100000 == 0 {
-                println!("idx={}; still inserting...", idx);
+            if idx % 100000 == 0 {
+                println!("idx={} elapsed={:.3}s; still inserting...", idx, last.elapsed().as_secs_f64());
+                last = Instant::now();
             }
         }
     }
