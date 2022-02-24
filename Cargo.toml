@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 bio = "0.39.2"
 roaring = "0.8.1"
+croaring = "0.5.1"
+show-image = "0.10.1"
+image = "0.24.1"
