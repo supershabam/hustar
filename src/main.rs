@@ -96,7 +96,6 @@ fn inc(b: &mut Vec<u64>, seq: &[u8]) {
         let s = &seq[..l];
         let addr = seq_to_bits(s) as usize;
         let idx = base + addr;
-        println!("l={} s={:?} base={} addr={}",l, s, base, addr);
         b[idx] += 1;
         base += unit.pow(l as u32) as usize;
     }
@@ -112,41 +111,29 @@ fn get(b: &[u64], seq: &[u8]) -> u64 {
     let idx = base + addr;
     b[idx]
 }
-
-// #[show_image::main]
 fn main() {
-    let seqlen = 2;
+    let seqlen = 20;
     let mut b = make_buf(seqlen);
-    inc(&mut b, b"gt");
-    inc(&mut b, b"at");
-    inc(&mut b, b"ga");
-    println!("{}", get(&b, b"t"));
-    println!("{:?}", b);
-}
-
-fn run() {
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
     let r = Reader::from_file(path).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
         println!("inserting sequences from {}", record.id());
-        if record.id() != "MU273354.1" {
+        if record.id() != "CM000663.2" {
             continue;
         }
         let i = record
             .seq()
-            .windows(20)
-            .filter(filter_n)
-            .map(seq_to_bits);
-        let mut count = 0_u64;
+            .windows(seqlen)
+            .filter(filter_n);
         let modulus = 1_000_000;
         let mut last = Instant::now();
         for (idx, elem) in i.enumerate() {
-            count += 1;
+            inc(&mut b, elem);
             if idx % modulus == 0 {
                 println!(
                     "processed total={} batch_size={} in {:.2}s",
-                    count,
+                    idx,
                     modulus,
                     last.elapsed().as_secs_f64()
                 );
