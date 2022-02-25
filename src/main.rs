@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use bio::alphabets;
 use bio::io::fasta::Reader;
 use croaring::Treemap;
@@ -9,6 +11,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 use std::{str, time};
+use binwrite::BinWrite;
 
 fn filter_n(seq: &&[u8]) -> bool {
     for l in seq.iter() {
@@ -111,8 +114,15 @@ fn get(b: &[u64], seq: &[u8]) -> u64 {
     let idx = base + addr;
     b[idx]
 }
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, BinWrite)]
+struct Bitmap {
+    V: Vec<u64>,
+    Seqlen: u32,
+}
+
 fn main() {
-    let seqlen = 20;
+    let seqlen = 3;
     let mut b = make_buf(seqlen);
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
     let r = Reader::from_file(path).unwrap();
@@ -122,23 +132,20 @@ fn main() {
         if record.id() != "CM000663.2" {
             continue;
         }
-        let i = record
-            .seq()
-            .windows(seqlen)
-            .filter(filter_n);
-        let modulus = 1_000_000;
+        let i = record.seq().windows(seqlen).filter(filter_n);
+        let modulus = 1_000_00;
         let mut last = Instant::now();
-        for (idx, elem) in i.enumerate() {
+        for elem in i {
+            // println!("inserting {}", str::from_utf8(elem).expect("while converting string"));
             inc(&mut b, elem);
-            if idx % modulus == 0 {
-                println!(
-                    "processed total={} batch_size={} in {:.2}s",
-                    idx,
-                    modulus,
-                    last.elapsed().as_secs_f64()
-                );
-                last = Instant::now();
-            }
         }
+        println!("writing to disk!");
+        println!("bitmap len={}", b.len());
+        println!("{:?}", b);
+        let path = "out.bin";
+        let mut file = File::create(path).expect("while creating file");
+        b.write(&mut file).expect("while writing to file");
+        file.flush().expect("while flushing file");
+        println!("wrote {}", path);
     }
 }
