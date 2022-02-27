@@ -115,13 +115,46 @@ fn get(b: &[u64], seq: &[u8]) -> u64 {
     b[idx]
 }
 
+fn serialize(b: &[u64], path: &str) {
+    let buf = bincode::serialize(b).expect("while serializing");
+    let mut f = File::create(path).expect("while opening file");
+    buf.write(&mut f).expect("while writing file");
+}
+
+fn deserialize(path: &str) -> Vec<u64> {
+    let mut f = File::open(path).expect("while opening file");
+    let mut encoded = Vec::new();
+    f.read_to_end(&mut encoded).expect("while reading");
+    let decoded: Vec<u64> = bincode::deserialize(&encoded[..]).unwrap();
+    decoded
+}
+
 #[derive(Deserialize, Serialize, Debug, PartialEq, BinWrite)]
 struct Bitmap {
     V: Vec<u64>,
     Seqlen: u32,
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::*;
+    #[test]
+    fn it_works() {
+        let seqlen = 3;
+        let mut b = make_buf(seqlen);
+        inc(&mut b, b"acc");
+        inc(&mut b, b"acg");
+        serialize(&b, "test.bin");
+        let b2 = deserialize("test.bin");
+        assert_eq!(b, b2);
+    }
+}
+
 fn main() {
+
+}
+
+fn create() {
     let seqlen = 3;
     let mut b = make_buf(seqlen);
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
@@ -140,12 +173,8 @@ fn main() {
             inc(&mut b, elem);
         }
         println!("writing to disk!");
-        println!("bitmap len={}", b.len());
-        println!("{:?}", b);
         let path = "out.bin";
-        let mut file = File::create(path).expect("while creating file");
-        b.write(&mut file).expect("while writing to file");
-        file.flush().expect("while flushing file");
+        serialize(&b, path);
         println!("wrote {}", path);
     }
 }
