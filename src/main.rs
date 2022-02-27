@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use binwrite::BinWrite;
 use bio::alphabets;
 use bio::io::fasta::Reader;
 use croaring::Treemap;
@@ -7,11 +8,11 @@ use image::imageops::resize;
 use image::ImageBuffer;
 use roaring::RoaringTreemap;
 use show_image::{create_window, ImageInfo, ImageView};
+use std::f64::consts::PI;
 use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 use std::{str, time};
-use binwrite::BinWrite;
 
 fn filter_n(seq: &&[u8]) -> bool {
     for l in seq.iter() {
@@ -46,6 +47,24 @@ fn seq_to_bits(seq: &[u8]) -> u64 {
         b = b | p;
     }
     b
+}
+
+fn bits_to_seq(bits: u64, bitsize: usize) -> String {
+    let mut bits = bits;
+    let mut seq = "".to_string();
+    for _ in 0..bitsize {
+        let tail = bits & 0b11;
+        bits = bits >> 2;
+        let s = match tail {
+            0b00 => "a",
+            0b01 => "c",
+            0b10 => "g",
+            0b11 => "t",
+            _ => panic!("impossible tail"),
+        };
+        seq.push_str(s);
+    }
+    seq.chars().rev().collect::<String>()
 }
 
 /*
@@ -139,7 +158,7 @@ struct Bitmap {
 mod tests {
     use crate::*;
     #[test]
-    fn it_works() {
+    fn test_serialization() {
         let seqlen = 3;
         let mut b = make_buf(seqlen);
         inc(&mut b, b"acc");
@@ -148,10 +167,62 @@ mod tests {
         let b2 = deserialize("test.bin");
         assert_eq!(b, b2);
     }
+
+    #[test]
+    fn test_seq_to_bits() {
+        let seq = "actg".to_string();
+        let bits: u64 = 0b00011110;
+        assert_eq!(seq_to_bits(seq.as_bytes()), bits);
+        assert_eq!(bits_to_seq(bits, 4), seq);
+    }
 }
 
 fn main() {
+    let path = "out.bin";
+    let bm = deserialize(path);
+    let max = bm.iter().fold(0, |acc, v| if acc > *v { acc } else { *v });
+    let width = 25;
+    let height = 25;
+    let circle_r = width as f64 / 6.0;
+    let mut img = ImageBuffer::from_fn(width, height, |px, py| {
+        let x: f64 = (px as i32 - (width / 2) as i32) as f64;
+        let y: f64 = (-(py as i32) + (height / 2) as i32) as f64;
+        let theta = {
+            let mut theta = (y / x).atan();
+            if x == 0.0 {
+                theta = 0.0;
+            }
+            if x < 0.0 {
+                theta += PI;
+            }
+            if theta < 0.0 {
+                theta = theta + PI + PI;
+            }
+            theta
+        };
+        let r = (x * x + y * y).sqrt();
+        let slice = PI / 2.0; // slice size decreases over time
+        let p = theta / slice;
+        let bit = p.floor() as usize;
 
+        let v = {
+            if r > circle_r {
+                0
+            } else {
+                bm[bit]
+            }
+        };
+        let normalized = v as f64 / max as f64;
+        let p = (normalized * 255.0) as u8;
+        println!(
+            "pixel ({}, {}) xy ({}, {}) r={} theta={} bit={} v={} p={}",
+            px, py, x, y, r, theta, bit, v, p
+        );
+
+        image::Luma([(normalized * 255.0) as u8])
+    });
+    img.save_with_format("out.png", image::ImageFormat::Png)
+        .expect("while writing image");
 }
 
 fn create() {
