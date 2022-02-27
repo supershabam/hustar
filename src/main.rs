@@ -203,20 +203,22 @@ fn main() {
         let r = (x * x + y * y).sqrt();
         let slice = PI / 2.0; // slice size decreases over time
         let p = theta / slice;
-        let bit = p.floor() as usize;
+        let bits = p.floor() as u64;
+        let bitsize: usize = 1;
+        let seq = bits_to_seq(bits, bitsize);
 
         let v = {
             if r > circle_r {
                 0
             } else {
-                bm[bit]
+                get(&bm, seq.as_bytes())
             }
         };
         let normalized = v as f64 / max as f64;
         let p = (normalized * 255.0) as u8;
         println!(
-            "pixel ({}, {}) xy ({}, {}) r={} theta={} bit={} v={} p={}",
-            px, py, x, y, r, theta, bit, v, p
+            "pixel ({}, {}) xy ({}, {}) r={} theta={} bits={} v={} p={}",
+            px, py, x, y, r, theta, bits, v, p
         );
 
         image::Luma([(normalized * 255.0) as u8])
