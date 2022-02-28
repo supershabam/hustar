@@ -175,15 +175,69 @@ mod tests {
         assert_eq!(seq_to_bits(seq.as_bytes()), bits);
         assert_eq!(bits_to_seq(bits, 4), seq);
     }
+
+    #[test]
+    fn test_seq_to_angle() {
+        assert_eq!(seq_to_angle(b"aaa"), 0.0);
+        assert_eq!(seq_to_angle(b"aac"), 2.0 * PI / 4.0 / 4.0 / 4.0);
+        assert_eq!(seq_to_angle(b"aag"), 2.0 * 2.0 * PI / 4.0 / 4.0 / 4.0);
+        assert_eq!(seq_to_angle(b"aat"), 3.0 * 2.0 * PI / 4.0 / 4.0 / 4.0);
+        assert_eq!(seq_to_angle(b"aca"), 4.0 * 2.0 * PI / 4.0 / 4.0 / 4.0);
+    }
+
+    #[test]
+    fn test_coords() {
+        let f = make_coords_to_seq(3.0);
+        assert_eq!(f(seq_to_angle(b"aaa"), 6.3), "aaa".to_string());
+        assert_eq!(f(seq_to_angle(b"aac"), 6.3), "aac".to_string());
+        assert_eq!(f(seq_to_angle(b"cac"), 6.3), "cac".to_string());
+        assert_eq!(f(seq_to_angle(b"tga"), 6.3), "tga".to_string());
+    }
+}
+
+fn seq_to_angle(seq: &[u8]) -> f64 {
+    let mut angle = 0.0;
+    let mut step = 2.0 * PI / 4.0;
+    for c in seq {
+        let v = seq_to_bits(&[*c]) as f64;
+        angle = angle + v * step;
+        step = step / 4.0;
+    }
+    angle
+}
+
+fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
+    Box::new(move |theta: f64, r: f64| -> String {
+        let mut slice = 2.0 * PI / 4.0;
+        let mut bits: u64 = 0;
+        let mut bitsize: usize = 0;
+        let n = (r / r_step).floor() as usize + 1;
+        for _ in 0..n {
+            let p = theta / slice;
+            let tail = (p.floor() as u64) % 4;
+            bits = bits << 2;
+            bits = bits | tail;
+            bitsize += 1;
+            slice = slice / 4.0;
+        }
+        let seq = bits_to_seq(bits, bitsize);
+        seq
+    })
 }
 
 fn main() {
+    create();
+}
+
+fn print() {
     let path = "out.bin";
+    let seqlen = 3;
     let bm = deserialize(path);
     let max = bm.iter().fold(0, |acc, v| if acc > *v { acc } else { *v });
-    let width = 25;
-    let height = 25;
+    let width = 500;
+    let height = 500;
     let circle_r = width as f64 / 6.0;
+    let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
         let y: f64 = (-(py as i32) + (height / 2) as i32) as f64;
@@ -201,14 +255,11 @@ fn main() {
             theta
         };
         let r = (x * x + y * y).sqrt();
-        let slice = PI / 2.0; // slice size decreases over time
-        let p = theta / slice;
-        let bits = p.floor() as u64;
-        let bitsize: usize = 1;
-        let seq = bits_to_seq(bits, bitsize);
-
+        let seq = coords_to_seq(theta, r);
         let v = {
-            if r > circle_r {
+            if seq.len() == 0 {
+                0
+            } else if seq.len() > seqlen {
                 0
             } else {
                 get(&bm, seq.as_bytes())
@@ -216,9 +267,10 @@ fn main() {
         };
         let normalized = v as f64 / max as f64;
         let p = (normalized * 255.0) as u8;
+
         println!(
-            "pixel ({}, {}) xy ({}, {}) r={} theta={} bits={} v={} p={}",
-            px, py, x, y, r, theta, bits, v, p
+            "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} v={} p={}",
+            px, py, x, y, r, theta, seq, v, p
         );
 
         image::Luma([(normalized * 255.0) as u8])
@@ -228,7 +280,7 @@ fn main() {
 }
 
 fn create() {
-    let seqlen = 3;
+    let seqlen = 5;
     let mut b = make_buf(seqlen);
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
     let r = Reader::from_file(path).unwrap();
