@@ -134,6 +134,16 @@ fn get(b: &[u64], seq: &[u8]) -> u64 {
     b[idx]
 }
 
+fn seqlen_to_bitmap_range(seqlen: usize) -> (usize, usize) {
+    let mut start = 0;
+    let mut range = 4;
+    for _ in 1..seqlen {
+        start += range;
+        range = range * 4;
+    }
+    (start, start + range)
+}
+
 fn serialize(b: &[u64], path: &str) {
     let buf = bincode::serialize(b).expect("while serializing");
     let mut f = File::create(path).expect("while opening file");
@@ -193,6 +203,14 @@ mod tests {
         assert_eq!(f(seq_to_angle(b"cac"), 6.3), "cac".to_string());
         assert_eq!(f(seq_to_angle(b"tga"), 6.3), "tga".to_string());
     }
+
+    #[test]
+    fn test_seqlen_range() {
+        assert_eq!(seqlen_to_bitmap_range(0), (0, 4));
+        assert_eq!(seqlen_to_bitmap_range(1), (0, 4));
+        assert_eq!(seqlen_to_bitmap_range(2), (4, 20));
+        assert_eq!(seqlen_to_bitmap_range(3), (20, 84));
+    }
 }
 
 fn seq_to_angle(seq: &[u8]) -> f64 {
@@ -226,17 +244,25 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    create();
+    let seqlen = 10;
+    print(seqlen);
 }
 
-fn print() {
+fn print(seqlen: usize) {
     let path = "out.bin";
-    let seqlen = 3;
     let bm = deserialize(path);
-    let max = bm.iter().fold(0, |acc, v| if acc > *v { acc } else { *v });
-    let width = 500;
-    let height = 500;
-    let circle_r = width as f64 / 6.0;
+    let maxes: Vec<u64> = (1..=seqlen)
+        .into_iter()
+        .map(|l| {
+            let (start, end) = seqlen_to_bitmap_range(l);
+            bm[start..end]
+                .iter()
+                .fold(0, |acc, v| if acc > *v { acc } else { *v })
+        })
+        .collect();
+    let width = 4000;
+    let height = 4000;
+    let circle_r = width as f64 / 20.0;
     let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
@@ -256,50 +282,54 @@ fn print() {
         };
         let r = (x * x + y * y).sqrt();
         let seq = coords_to_seq(theta, r);
-        let v = {
+        let p = {
             if seq.len() == 0 {
                 0
             } else if seq.len() > seqlen {
                 0
             } else {
-                get(&bm, seq.as_bytes())
+                let v = get(&bm, seq.as_bytes());
+                let normalized = v as f64 / maxes[seq.len() - 1] as f64;
+                (normalized * 255.0) as u8
             }
         };
-        let normalized = v as f64 / max as f64;
-        let p = (normalized * 255.0) as u8;
+        // println!(
+        //     "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} p={}",
+        //     px, py, x, y, r, theta, seq, p
+        // );
 
-        println!(
-            "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} v={} p={}",
-            px, py, x, y, r, theta, seq, v, p
-        );
-
-        image::Luma([(normalized * 255.0) as u8])
+        image::Luma([p])
     });
     img.save_with_format("out.png", image::ImageFormat::Png)
         .expect("while writing image");
 }
 
-fn create() {
-    let seqlen = 5;
+fn create(seqlen: usize) {
     let mut b = make_buf(seqlen);
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
     let r = Reader::from_file(path).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
+        let t0 = Instant::now();
         println!("inserting sequences from {}", record.id());
-        if record.id() != "CM000663.2" {
-            continue;
-        }
+        let log_modulus = 1_000_000;
         let i = record.seq().windows(seqlen).filter(filter_n);
-        let modulus = 1_000_00;
-        let mut last = Instant::now();
-        for elem in i {
+        for (count, elem) in i.enumerate() {
             // println!("inserting {}", str::from_utf8(elem).expect("while converting string"));
             inc(&mut b, elem);
+            if count & log_modulus == 0 {
+                println!("inserted {} elements", count);
+            }
         }
+        let t1 = Instant::now();
         println!("writing to disk!");
         let path = "out.bin";
         serialize(&b, path);
-        println!("wrote {}", path);
+        println!(
+            "wrote {} creating={:.02} serializing={:.02}",
+            path,
+            t0.elapsed().as_secs_f64(),
+            t1.elapsed().as_secs_f64()
+        );
     }
 }
