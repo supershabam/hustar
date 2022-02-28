@@ -244,8 +244,8 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    let seqlen = 10;
-    print(seqlen);
+    let seqlen = 12;
+    create(seqlen);
 }
 
 fn print(seqlen: usize) {
@@ -315,10 +315,13 @@ fn create(seqlen: usize) {
         let log_modulus = 1_000_000;
         let i = record.seq().windows(seqlen).filter(filter_n);
         for (count, elem) in i.enumerate() {
-            // println!("inserting {}", str::from_utf8(elem).expect("while converting string"));
             inc(&mut b, elem);
-            if count & log_modulus == 0 {
-                println!("inserted {} elements", count);
+            if count % log_modulus == 0 {
+                println!(
+                    "inserted {} elements elapsed={:.02}s",
+                    count,
+                    t0.elapsed().as_secs_f64()
+                );
             }
         }
         let t1 = Instant::now();
