@@ -245,12 +245,14 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 
 fn main() {
     let seqlen = 12;
-    create(seqlen);
+    print(seqlen);
 }
 
 fn print(seqlen: usize) {
     let path = "out.bin";
+    println!("opening {}", path);
     let bm = deserialize(path);
+    println!("creating image");
     let maxes: Vec<u64> = (1..=seqlen)
         .into_iter()
         .map(|l| {
@@ -262,7 +264,7 @@ fn print(seqlen: usize) {
         .collect();
     let width = 4000;
     let height = 4000;
-    let circle_r = width as f64 / 20.0;
+    let circle_r = width as f64 / (1150.0);
     let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
@@ -278,19 +280,24 @@ fn print(seqlen: usize) {
             if theta < 0.0 {
                 theta = theta + PI + PI;
             }
+            theta = theta + PI / 7.23;
+            if theta > 2.0 * PI {
+                theta = theta - 2.0 * PI;
+            }
             theta
         };
-        let r = (x * x + y * y).sqrt();
-        let seq = coords_to_seq(theta, r);
+        let r = (x * x + y * y).sqrt().sqrt();
+        let steps = (r / circle_r).ceil() as usize;
         let p = {
-            if seq.len() == 0 {
+            if steps == 0 {
                 0
-            } else if seq.len() > seqlen {
+            } else if steps > seqlen {
                 0
             } else {
+                let seq = coords_to_seq(theta, r);
                 let v = get(&bm, seq.as_bytes());
                 let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-                (normalized * 255.0) as u8
+                (normalized.sqrt().sqrt() * 255.0) as u8
             }
         };
         // println!(
@@ -324,15 +331,15 @@ fn create(seqlen: usize) {
                 );
             }
         }
-        let t1 = Instant::now();
-        println!("writing to disk!");
-        let path = "out.bin";
-        serialize(&b, path);
         println!(
-            "wrote {} creating={:.02} serializing={:.02}",
-            path,
+            "inserted all records for {} elapsed={:.2}s",
+            record.id(),
             t0.elapsed().as_secs_f64(),
-            t1.elapsed().as_secs_f64()
         );
     }
+    let t0 = Instant::now();
+    println!("writing to disk!");
+    let path = "out.bin";
+    serialize(&b, path);
+    println!("wrote to disk in {:.2}s", t0.elapsed().as_secs_f64());
 }
