@@ -1,3 +1,5 @@
+mod encoding;
+
 use serde::{Deserialize, Serialize};
 
 use binwrite::BinWrite;
@@ -244,8 +246,8 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    let seqlen = 12;
-    print(seqlen);
+    let seqlen = 14;
+    create(seqlen);
 }
 
 fn print(seqlen: usize) {
@@ -286,7 +288,10 @@ fn print(seqlen: usize) {
             }
             theta
         };
-        let r = (x * x + y * y).sqrt().sqrt();
+        let r = (x * x + y * y).sqrt();
+        
+        let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
+        let r = r + theta / (2.0*PI); // add spiral between tiers
         let steps = (r / circle_r).ceil() as usize;
         let p = {
             if steps == 0 {
