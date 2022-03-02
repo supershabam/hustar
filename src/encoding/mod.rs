@@ -1,17 +1,32 @@
+
+// Example lazily consumes an iterator of values to act itself
+// as an iterator.
+// My intent is to use this pattern to flexibly digest the human genome
+// which is 3.1e9 characters long.
 struct Example<'a> {
     i: &'a mut dyn Iterator<Item = u64>,
+    last: u64,
 }
 
 impl<'a> Example<'a> {
     fn new(i: &'a mut impl Iterator<Item = u64>) -> Example<'a> {
-        Example { i: i }
+        Example { 
+          i: i,
+          last: 0,
+        }
     }
 }
 
 impl<'a> Iterator for Example<'a> {
     type Item = u64;
     fn next(self: &mut Example<'a>) -> Option<Self::Item> {
-      self.i.next()
+      match self.i.next() {
+        None => None,
+        Some(i) => {
+          self.last = i ^ self.last;
+          Some(self.last)
+        }
+      }
     }
 }
 
@@ -25,7 +40,7 @@ mod tests {
       let mut i = v.into_iter();
       let e = Example::new(&mut i);
       for v in e {
-        println!("{}", v);
+        println!("{:#016b}", v);
       }
     }
 }
