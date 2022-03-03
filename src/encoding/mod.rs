@@ -1,32 +1,36 @@
+use bitvec::prelude::*;
+use byteorder::{BigEndian, ByteOrder};
 
-// Example lazily consumes an iterator of values to act itself
-// as an iterator.
-// My intent is to use this pattern to flexibly digest the human genome
-// which is 3.1e9 characters long.
-struct Example<'a> {
+struct Encoder<'a> {
     i: &'a mut dyn Iterator<Item = u64>,
-    last: u64,
+    buf: BitVec<u8, Msb0>,
 }
 
-impl<'a> Example<'a> {
-    fn new(i: &'a mut impl Iterator<Item = u64>) -> Example<'a> {
-        Example { 
-          i: i,
-          last: 0,
+impl<'a> Encoder<'a> {
+    fn new(i: &'a mut impl Iterator<Item = u64>) -> Self {
+        Self {
+            i: i,
+            buf: BitVec::new(),
         }
     }
 }
 
-impl<'a> Iterator for Example<'a> {
-    type Item = u64;
-    fn next(self: &mut Example<'a>) -> Option<Self::Item> {
-      match self.i.next() {
-        None => None,
-        Some(i) => {
-          self.last = i ^ self.last;
-          Some(self.last)
+impl<'a> Iterator for Encoder<'a> {
+    type Item = u8;
+    fn next(self: &mut Encoder<'a>) -> Option<Self::Item> {
+        if self.buf.len() < 8 {
+            let next = self.i.next();
+            match next {
+                None => return None,
+                Some(c) => {
+                    let bits = c.view_bits::<Msb0>();
+                    self.buf.extend(bits);
+                }
+            }
         }
-      }
+        let head = self.buf.drain(0..8).collect::<BitVec<u8, Msb0>>();
+        let head = head.load_be::<u8>();
+        Some(head)
     }
 }
 
@@ -36,12 +40,13 @@ mod tests {
 
     #[test]
     fn test() {
-      let v = vec![0, 1, 2, 3];
-      let mut i = v.into_iter();
-      let e = Example::new(&mut i);
-      for v in e {
-        println!("{:#016b}", v);
-      }
+        let v = vec![0xff_00_fe];
+        let mut i = v.into_iter();
+        let e = Encoder::new(&mut i);
+        for v in e {
+            println!("{:064b}", 0xfe_u64);
+            println!("{:08b}", v);
+        }
     }
 }
 
