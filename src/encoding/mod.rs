@@ -1,13 +1,12 @@
 use bitvec::prelude::*;
-use byteorder::{BigEndian, ByteOrder};
 
-struct Encoder<'a> {
+pub struct Encoder<'a> {
     i: &'a mut dyn Iterator<Item = u64>,
     buf: BitVec<u8, Msb0>,
 }
 
 impl<'a> Encoder<'a> {
-    fn new(i: &'a mut impl Iterator<Item = u64>) -> Self {
+    pub fn new(i: &'a mut impl Iterator<Item = u64>) -> Self {
         Self {
             i: i,
             buf: BitVec::new(),

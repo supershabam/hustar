@@ -247,8 +247,24 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    let seqlen = 14;
-    create(seqlen);
+    let seqlen = 4;
+    let outpath = format!("seqlen={}.bin", seqlen);
+    create(seqlen, &outpath);
+}
+
+fn read(seqlen: usize) {
+    let path = "out.bin";
+    println!("opening {}", path);
+    let bm = deserialize(path);
+    let (start, end) = seqlen_to_bitmap_range(seqlen);
+    let mut i = bm[start..end].iter().cloned();
+    let e = encoding::Encoder::new(&mut i);
+    let mut count = 0;
+    for (idx, v) in e.enumerate() {
+        println!("{:08b}", v);
+        count = idx;
+    }
+    println!("{} bytes", count);
 }
 
 fn print(seqlen: usize) {
@@ -317,7 +333,7 @@ fn print(seqlen: usize) {
         .expect("while writing image");
 }
 
-fn create(seqlen: usize) {
+fn create(seqlen: usize, outpath: &str) {
     let mut b = make_buf(seqlen);
     let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
     let r = Reader::from_file(path).unwrap();
@@ -344,8 +360,7 @@ fn create(seqlen: usize) {
         );
     }
     let t0 = Instant::now();
-    println!("writing to disk!");
-    let path = "out.bin";
-    serialize(&b, path);
+    println!("writing to disk {}!", outpath);
+    serialize(&b, outpath);
     println!("wrote to disk in {:.2}s", t0.elapsed().as_secs_f64());
 }
