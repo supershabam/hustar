@@ -1,4 +1,5 @@
 mod encoding;
+mod window;
 
 use serde::{Deserialize, Serialize};
 
