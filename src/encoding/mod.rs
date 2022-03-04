@@ -3,6 +3,7 @@ use bitvec::prelude::*;
 pub struct Encoder<'a> {
     i: &'a mut dyn Iterator<Item = u64>,
     buf: BitVec<u8, Msb0>,
+    anchor: Option<u64>,
 }
 
 impl<'a> Encoder<'a> {
@@ -10,6 +11,7 @@ impl<'a> Encoder<'a> {
         Self {
             i: i,
             buf: BitVec::new(),
+            anchor: None,
         }
     }
 }
@@ -22,7 +24,17 @@ impl<'a> Iterator for Encoder<'a> {
             match next {
                 None => return None,
                 Some(c) => {
-                    let bits = c.view_bits::<Msb0>();
+                    let delta = match self.anchor {
+                        None => {
+                            self.anchor = Some(c);
+                            c as i64
+                        },
+                        Some(anchor) => c as i64 - anchor as i64
+                    };
+                    // let delta = vint64::signed::encode(delta);
+                    // delta.as_ref()
+                    let delta = delta as u64;
+                    let bits = delta.view_bits::<Msb0>();
                     self.buf.extend(bits);
                 }
             }
@@ -39,13 +51,27 @@ mod tests {
 
     #[test]
     fn test() {
-        let v = vec![0xff_00_fe];
+        let v = vec![0xff_00_fe, 0x00];
         let mut i = v.into_iter();
         let e = Encoder::new(&mut i);
         for v in e {
             println!("{:064b}", 0xfe_u64);
             println!("{:08b}", v);
         }
+    }
+
+    #[test]
+    fn test_vint() {
+        let original = 0x7fff_ffff_ffff_ffff_i64;
+        let delta = vint64::signed::encode(original);
+        let mut bv: BitVec::<u8, Msb0> = BitVec::new();
+        bv.extend(delta.as_ref());
+        let len = vint64::decoded_len(bv[0..8].load_be::<u8>());
+        assert_eq!(delta.as_ref().len(), len);
+        let buf: BitVec<u8, Msb0> = bv.drain(0..len*8).collect();
+        let mut buf = buf.as_raw_slice();
+        let decoded = vint64::signed::decode(&mut buf).expect("while decoding");
+        assert_eq!(decoded, original);
     }
 }
 

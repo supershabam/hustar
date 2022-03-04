@@ -249,11 +249,10 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 fn main() {
     let seqlen = 4;
     let outpath = format!("seqlen={}.bin", seqlen);
-    create(seqlen, &outpath);
+    read(seqlen, &outpath);
 }
 
-fn read(seqlen: usize) {
-    let path = "out.bin";
+fn read(seqlen: usize, path: &str) {
     println!("opening {}", path);
     let bm = deserialize(path);
     let (start, end) = seqlen_to_bitmap_range(seqlen);
@@ -262,7 +261,7 @@ fn read(seqlen: usize) {
     let mut count = 0;
     for (idx, v) in e.enumerate() {
         println!("{:08b}", v);
-        count = idx;
+        count = idx + 1;
     }
     println!("{} bytes", count);
 }
@@ -339,6 +338,9 @@ fn create(seqlen: usize, outpath: &str) {
     let r = Reader::from_file(path).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
+        if record.id() != "CM000667.2" {
+            continue
+        }
         let t0 = Instant::now();
         println!("inserting sequences from {}", record.id());
         let log_modulus = 1_000_000;
