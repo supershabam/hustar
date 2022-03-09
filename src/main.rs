@@ -6,16 +6,41 @@ use serde::{Deserialize, Serialize};
 use binwrite::BinWrite;
 use bio::alphabets;
 use bio::io::fasta::Reader;
-use croaring::Treemap;
 use image::imageops::resize;
 use image::ImageBuffer;
-use roaring::RoaringTreemap;
 use show_image::{create_window, ImageInfo, ImageView};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 use std::{str, time};
+
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[clap(name = "hustar")]
+#[clap(about = "builds subsequence frequency index of genomic data", long_about = None)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    #[clap(arg_required_else_help = true)]
+    Build {
+        fasta_file: String,
+        index_file: String,
+        sequence_length: usize,
+    },
+    #[clap(arg_required_else_help = true)]
+    Visualize {
+        index_file: String,
+        sequence_length: usize,
+    },
+}
+
+
 
 fn filter_n(seq: &&[u8]) -> bool {
     for l in seq.iter() {
@@ -247,12 +272,19 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    let seqlen = 4;
-    let outpath = format!("seqlen={}.bin", seqlen);
-    read(seqlen, &outpath);
+    let args = Cli::parse();
+    match &args.command {
+        Commands::Build { fasta_file, index_file, sequence_length} => {
+            create(fasta_file, index_file, *sequence_length);
+        },
+        Commands::Visualize { index_file, sequence_length } => {
+            print(index_file, *sequence_length);
+        },
+        _ => panic!("oh no"),
+    }
 }
 
-fn read(seqlen: usize, path: &str) {
+fn read(index_file: &str, seqlen: usize, path: &str) {
     println!("opening {}", path);
     let bm = deserialize(path);
     let (start, end) = seqlen_to_bitmap_range(seqlen);
@@ -266,10 +298,9 @@ fn read(seqlen: usize, path: &str) {
     println!("{} bytes", count);
 }
 
-fn print(seqlen: usize) {
-    let path = "out.bin";
-    println!("opening {}", path);
-    let bm = deserialize(path);
+fn print(index_file: &str, seqlen: usize) {
+    println!("opening {}", index_file);
+    let bm = deserialize(index_file);
     println!("creating image");
     let maxes: Vec<u64> = (1..=seqlen)
         .into_iter()
@@ -332,10 +363,9 @@ fn print(seqlen: usize) {
         .expect("while writing image");
 }
 
-fn create(seqlen: usize, outpath: &str) {
+fn create(fasta_file: &str, outpath: &str, seqlen: usize) {
     let mut b = make_buf(seqlen);
-    let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
-    let r = Reader::from_file(path).unwrap();
+    let r = Reader::from_file(fasta_file).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
         if record.id() != "CM000667.2" {

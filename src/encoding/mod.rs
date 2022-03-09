@@ -3,7 +3,7 @@ use bitvec::prelude::*;
 pub struct Encoder<'a> {
     i: &'a mut dyn Iterator<Item = u64>,
     buf: BitVec<u8, Msb0>,
-    anchor: Option<u64>,
+    anchor: Option<i64>,
 }
 
 impl<'a> Encoder<'a> {
@@ -19,29 +19,29 @@ impl<'a> Encoder<'a> {
 impl<'a> Iterator for Encoder<'a> {
     type Item = u8;
     fn next(self: &mut Encoder<'a>) -> Option<Self::Item> {
-        if self.buf.len() < 8 {
-            let next = self.i.next();
-            match next {
-                None => return None,
-                Some(c) => {
-                    let delta = match self.anchor {
-                        None => {
-                            self.anchor = Some(c);
-                            c as i64
-                        },
-                        Some(anchor) => c as i64 - anchor as i64
-                    };
-                    // let delta = vint64::signed::encode(delta);
-                    // delta.as_ref()
-                    let delta = delta as u64;
-                    let bits = delta.view_bits::<Msb0>();
-                    self.buf.extend(bits);
+        loop {
+            if self.buf.len() < 8 {
+                let next = self.i.next();
+                match next {
+                    None => return None,
+                    Some(c) => {
+                        let delta = match self.anchor {
+                            None => {
+                                c as i64
+                            }
+                            Some(anchor) => c as i64 - anchor,
+                        };
+                        self.anchor = Some(delta);
+                        let delta = vint64::signed::encode(delta);
+                        self.buf.extend(delta.as_ref());
+                        println!("extended {} bytes", delta.as_ref().len());
+                    }
                 }
             }
+            let head = self.buf.drain(0..8).collect::<BitVec<u8, Msb0>>();
+            let head = head.load_be::<u8>();
+            return Some(head)
         }
-        let head = self.buf.drain(0..8).collect::<BitVec<u8, Msb0>>();
-        let head = head.load_be::<u8>();
-        Some(head)
     }
 }
 
@@ -64,11 +64,11 @@ mod tests {
     fn test_vint() {
         let original = 0x7fff_ffff_ffff_ffff_i64;
         let delta = vint64::signed::encode(original);
-        let mut bv: BitVec::<u8, Msb0> = BitVec::new();
+        let mut bv: BitVec<u8, Msb0> = BitVec::new();
         bv.extend(delta.as_ref());
         let len = vint64::decoded_len(bv[0..8].load_be::<u8>());
         assert_eq!(delta.as_ref().len(), len);
-        let buf: BitVec<u8, Msb0> = bv.drain(0..len*8).collect();
+        let buf: BitVec<u8, Msb0> = bv.drain(0..len * 8).collect();
         let mut buf = buf.as_raw_slice();
         let decoded = vint64::signed::decode(&mut buf).expect("while decoding");
         assert_eq!(decoded, original);
