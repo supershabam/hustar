@@ -1,18 +1,46 @@
+mod encoding;
+mod window;
+
 use serde::{Deserialize, Serialize};
 
 use binwrite::BinWrite;
 use bio::alphabets;
 use bio::io::fasta::Reader;
-use croaring::Treemap;
 use image::imageops::resize;
 use image::ImageBuffer;
-use roaring::RoaringTreemap;
 use show_image::{create_window, ImageInfo, ImageView};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::prelude::*;
 use std::time::Instant;
 use std::{str, time};
+
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[clap(name = "hustar")]
+#[clap(about = "builds subsequence frequency index of genomic data", long_about = None)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    #[clap(arg_required_else_help = true)]
+    Build {
+        fasta_file: String,
+        index_file: String,
+        sequence_length: usize,
+    },
+    #[clap(arg_required_else_help = true)]
+    Visualize {
+        index_file: String,
+        sequence_length: usize,
+    },
+}
+
+
 
 fn filter_n(seq: &&[u8]) -> bool {
     for l in seq.iter() {
@@ -244,13 +272,36 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn main() {
-    let seqlen = 12;
-    create(seqlen);
+    let args = Cli::parse();
+    match &args.command {
+        Commands::Build { fasta_file, index_file, sequence_length} => {
+            create(fasta_file, index_file, *sequence_length);
+        },
+        Commands::Visualize { index_file, sequence_length } => {
+            print(index_file, *sequence_length);
+        },
+        _ => panic!("oh no"),
+    }
 }
 
-fn print(seqlen: usize) {
-    let path = "out.bin";
+fn read(index_file: &str, seqlen: usize, path: &str) {
+    println!("opening {}", path);
     let bm = deserialize(path);
+    let (start, end) = seqlen_to_bitmap_range(seqlen);
+    let mut i = bm[start..end].iter().cloned();
+    let e = encoding::Encoder::new(&mut i);
+    let mut count = 0;
+    for (idx, v) in e.enumerate() {
+        println!("{:08b}", v);
+        count = idx + 1;
+    }
+    println!("{} bytes", count);
+}
+
+fn print(index_file: &str, seqlen: usize) {
+    println!("opening {}", index_file);
+    let bm = deserialize(index_file);
+    println!("creating image");
     let maxes: Vec<u64> = (1..=seqlen)
         .into_iter()
         .map(|l| {
@@ -262,7 +313,7 @@ fn print(seqlen: usize) {
         .collect();
     let width = 4000;
     let height = 4000;
-    let circle_r = width as f64 / 20.0;
+    let circle_r = width as f64 / (1150.0);
     let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
@@ -278,19 +329,27 @@ fn print(seqlen: usize) {
             if theta < 0.0 {
                 theta = theta + PI + PI;
             }
+            theta = theta + PI / 7.23;
+            if theta > 2.0 * PI {
+                theta = theta - 2.0 * PI;
+            }
             theta
         };
         let r = (x * x + y * y).sqrt();
-        let seq = coords_to_seq(theta, r);
+        
+        let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
+        let r = r + theta / (2.0*PI); // add spiral between tiers
+        let steps = (r / circle_r).ceil() as usize;
         let p = {
-            if seq.len() == 0 {
+            if steps == 0 {
                 0
-            } else if seq.len() > seqlen {
+            } else if steps > seqlen {
                 0
             } else {
+                let seq = coords_to_seq(theta, r);
                 let v = get(&bm, seq.as_bytes());
                 let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-                (normalized * 255.0) as u8
+                (normalized.sqrt().sqrt() * 255.0) as u8
             }
         };
         // println!(
@@ -304,12 +363,14 @@ fn print(seqlen: usize) {
         .expect("while writing image");
 }
 
-fn create(seqlen: usize) {
+fn create(fasta_file: &str, outpath: &str, seqlen: usize) {
     let mut b = make_buf(seqlen);
-    let path = "files/ncbi-genomes-2022-02-23/GCA_000001405.29_GRCh38.p14_genomic.fna";
-    let r = Reader::from_file(path).unwrap();
+    let r = Reader::from_file(fasta_file).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
+        if record.id() != "CM000667.2" {
+            continue
+        }
         let t0 = Instant::now();
         println!("inserting sequences from {}", record.id());
         let log_modulus = 1_000_000;
@@ -324,15 +385,14 @@ fn create(seqlen: usize) {
                 );
             }
         }
-        let t1 = Instant::now();
-        println!("writing to disk!");
-        let path = "out.bin";
-        serialize(&b, path);
         println!(
-            "wrote {} creating={:.02} serializing={:.02}",
-            path,
+            "inserted all records for {} elapsed={:.2}s",
+            record.id(),
             t0.elapsed().as_secs_f64(),
-            t1.elapsed().as_secs_f64()
         );
     }
+    let t0 = Instant::now();
+    println!("writing to disk {}!", outpath);
+    serialize(&b, outpath);
+    println!("wrote to disk in {:.2}s", t0.elapsed().as_secs_f64());
 }
