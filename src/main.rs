@@ -12,8 +12,17 @@ use show_image::{create_window, ImageInfo, ImageView};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::PathBuf;
+use std::fs::OpenOptions;
+use std::rc::Rc;
 use std::time::Instant;
 use std::{str, time};
+use anyhow::Result;
+use memmap2::MmapMut;
+
+use byteorder::BigEndian;
+use zerocopy::byteorder::U64;
+use zerocopy::LayoutVerified;
 
 use clap::{Parser, Subcommand};
 
@@ -130,16 +139,26 @@ inc(seq: &[u8])
   }
 */
 
-fn make_buf(seqlen: usize) -> Vec<u64> {
+fn make_buf<'a>(path: &PathBuf, seqlen: usize) -> Result<MmapMut> {
     let base = 4_u64;
     let mut size = 0;
     for l in 1..=seqlen {
         size += base.pow(l as u32);
     }
-    vec![0_u64; size as usize]
+    let mut file = OpenOptions::new()
+                       .read(true)
+                       .write(true)
+                       .create(true)
+                       .open(&path)?;
+    file.set_len(size)?;
+    let mut mmap = unsafe { MmapMut::map_mut(&file)? };
+    // let (_, mut umap, _) = unsafe { mmap.align_to_mut::<u64>() };
+    // Ok(Box::new(&mmap[..]))
+    Ok(mmap)
 }
 
-fn inc(b: &mut Vec<u64>, seq: &[u8]) {
+fn inc(mmap: &mut MmapMut, seq: &[u8]) {
+    let (_, mut b, _) = unsafe { mmap.align_to_mut::<u64>() };
     let unit: u64 = 4;
     let mut base: usize = 0;
     for l in 1..=seq.len() {
@@ -198,12 +217,12 @@ mod tests {
     #[test]
     fn test_serialization() {
         let seqlen = 3;
-        let mut b = make_buf(seqlen);
+        let mut b = make_buf(&PathBuf::from(r"testing.bin"), seqlen).expect("while creating buf");
         inc(&mut b, b"acc");
         inc(&mut b, b"acg");
-        serialize(&b, "test.bin");
-        let b2 = deserialize("test.bin");
-        assert_eq!(b, b2);
+        // serialize(&b, "test.bin");
+        // let b2 = deserialize("test.bin");
+        // assert_eq!(b, b2);
     }
 
     #[test]
@@ -363,8 +382,9 @@ fn print(index_file: &str, seqlen: usize) {
         .expect("while writing image");
 }
 
-fn create(fasta_file: &str, outpath: &str, seqlen: usize) {
-    let mut b = make_buf(seqlen);
+fn create(fasta_file: &str, outpath: &str, seqlen: usize) -> Result<()> {
+    let p = PathBuf::from(r"what.bin");
+    let b = make_buf(&p, seqlen)?;
     let r = Reader::from_file(fasta_file).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
@@ -376,7 +396,7 @@ fn create(fasta_file: &str, outpath: &str, seqlen: usize) {
         let log_modulus = 1_000_000;
         let i = record.seq().windows(seqlen).filter(filter_n);
         for (count, elem) in i.enumerate() {
-            inc(&mut b, elem);
+            // inc(&mut b, elem);
             if count % log_modulus == 0 {
                 println!(
                     "inserted {} elements elapsed={:.02}s",
@@ -393,6 +413,7 @@ fn create(fasta_file: &str, outpath: &str, seqlen: usize) {
     }
     let t0 = Instant::now();
     println!("writing to disk {}!", outpath);
-    serialize(&b, outpath);
+    // serialize(&b, outpath);
     println!("wrote to disk in {:.2}s", t0.elapsed().as_secs_f64());
+    Ok(())
 }

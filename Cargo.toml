@@ -17,3 +17,6 @@ bitvec = "1"
 byteorder = "1.4.3"
 vint64 = "1.0.1"
 clap = { version = "3.1.6", features = ["derive"] }
+memmap2 = "0.5.3"
+anyhow = "1.0.56"
+zerocopy = "0.6.1"
