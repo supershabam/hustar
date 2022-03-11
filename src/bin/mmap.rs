@@ -1,16 +1,15 @@
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, File};
 use std::path::PathBuf;
 
 use anyhow::Result;
 use memmap2::MmapMut;
 
-struct Buf<'a> {
-    mmap: &'a MmapMut,
-    buf: &'a mut [u64],
+struct Buf {
+    mmap: Box<MmapMut>,
 }
 
-impl Buf<'a> {
-    fn new<'a>() -> Result<Self> {
+impl Buf {
+    fn new() -> Result<Self> {
         let path: PathBuf = PathBuf::from(r"test.bin");
         let file = OpenOptions::new()
             .read(true)
@@ -18,16 +17,15 @@ impl Buf<'a> {
             .create(true)
             .open(&path)?;
         file.set_len(4062)?;
-        let mut mmap = unsafe { MmapMut::map_mut(&file)? };
-        let (_, mut buf, _) = unsafe { mmap.align_to_mut::<u64>() };
-        Ok(Buf<'a>{
-            mmap: &mmap,
-            buf: buf,
+        let mut mmap = unsafe { Box::new(MmapMut::map_mut(&file)?) };
+        Ok(Buf{
+            mmap: mmap,
         })
     }
 }
 
 fn main() -> Result<()> {
-    let buf = Buf::new()?;
+    let mut buf = Buf::new()?;
+    buf.mmap[3] = 8;
     Ok(())
 }
