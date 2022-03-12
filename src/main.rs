@@ -327,7 +327,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
                 let seq = coords_to_seq(theta, r);
                 let v = get(&m, seq.as_bytes());
                 let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-                (normalized.sqrt() * 255.0) as u8
+                (normalized.sqrt().sqrt().sqrt() * 255.0) as u8
             }
         };
         // println!(
