@@ -316,7 +316,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
         let r = (x * x + y * y).sqrt();
         
         let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
-        let r = r + theta / (2.0*PI); // add spiral between tiers
+        // let r = r + theta / (2.0*PI); // add spiral between tiers
         let steps = (r / circle_r).ceil() as usize;
         let p = {
             if steps == 0 {
@@ -327,7 +327,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
                 let seq = coords_to_seq(theta, r);
                 let v = get(&m, seq.as_bytes());
                 let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-                (normalized.sqrt().sqrt() * 255.0) as u8
+                (normalized.sqrt() * 255.0) as u8
             }
         };
         // println!(
