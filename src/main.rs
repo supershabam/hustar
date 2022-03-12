@@ -291,7 +291,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
         .collect();
     let width = 4000;
     let height = 4000;
-    let circle_r = width as f64 / (1150.0);
+    let circle_r = width as f64 / (1450.0);
     let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
