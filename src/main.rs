@@ -143,13 +143,18 @@ inc(seq: &[u8])
 */
 
 fn make_buf<'a, P: Into<PathBuf>>(path: P, seqlen: usize) -> Result<Mmap> {
+    let size = buf_size_bytes(seqlen);
+    let m = Mmap::new(path, size)?;
+    Ok(m)
+}
+
+fn buf_size_bytes(seqlen: usize) -> u64 {
     let base = 4_u64;
     let mut size = 0;
     for l in 1..=seqlen {
         size += base.pow(l as u32);
     }
-    let m = Mmap::new(path, size * 8)?;
-    Ok(m)
+    size * 8
 }
 
 fn inc(m: &mut Mmap, seq: &[u8]) {
@@ -260,91 +265,82 @@ fn main() {
             create(fasta_file, index_file, *sequence_length);
         },
         Commands::Visualize { index_file, sequence_length } => {
-            // print(index_file, *sequence_length);
-            panic!("not impl");
+            print(index_file, *sequence_length);
         },
         _ => panic!("oh no"),
     }
 }
 
-// fn read(index_file: &str, seqlen: usize, path: &str) {
-//     println!("opening {}", path);
-//     let bm = Mmap::new(path, size);
-//     let (start, end) = seqlen_to_bitmap_range(seqlen);
-//     let mut i = bm[start..end].iter().cloned();
-//     let e = encoding::Encoder::new(&mut i);
-//     let mut count = 0;
-//     for (idx, v) in e.enumerate() {
-//         println!("{:08b}", v);
-//         count = idx + 1;
-//     }
-//     println!("{} bytes", count);
-// }
-
-// fn print(index_file: &str, seqlen: usize) -> Result<()> {
-//     println!("opening {}", index_file);
-//     let m = Mmap::new(index_file, size)?;
-//     println!("creating image");
-//     let maxes: Vec<u64> = (1..=seqlen)
-//         .into_iter()
-//         .map(|l| {
-//             let (start, end) = seqlen_to_bitmap_range(l);
-//             m[start..end]
-//                 .iter()
-//                 .fold(0, |acc, v| if acc > *v { acc } else { *v })
-//         })
-//         .collect();
-//     let width = 4000;
-//     let height = 4000;
-//     let circle_r = width as f64 / (1150.0);
-//     let coords_to_seq = make_coords_to_seq(circle_r);
-//     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
-//         let x: f64 = (px as i32 - (width / 2) as i32) as f64;
-//         let y: f64 = (-(py as i32) + (height / 2) as i32) as f64;
-//         let theta = {
-//             let mut theta = (y / x).atan();
-//             if x == 0.0 {
-//                 theta = 0.0;
-//             }
-//             if x < 0.0 {
-//                 theta += PI;
-//             }
-//             if theta < 0.0 {
-//                 theta = theta + PI + PI;
-//             }
-//             theta = theta + PI / 7.23;
-//             if theta > 2.0 * PI {
-//                 theta = theta - 2.0 * PI;
-//             }
-//             theta
-//         };
-//         let r = (x * x + y * y).sqrt();
+fn print(index_file: &str, seqlen: usize) -> Result<()> {
+    println!("opening {}", index_file);
+    let size = buf_size_bytes(seqlen);
+    let m = Mmap::new(index_file, size)?;
+    println!("creating image");
+    let maxes: Vec<u64> = (1..=seqlen)
+        .into_iter()
+        .map(|l| {
+            let (start, end) = seqlen_to_bitmap_range(l);
+            let mut max = 0;
+            for idx in start..end {
+                if m[idx] > max {
+                    max = m[idx]
+                }
+            }
+            max
+        })
+        .collect();
+    let width = 4000;
+    let height = 4000;
+    let circle_r = width as f64 / (1150.0);
+    let coords_to_seq = make_coords_to_seq(circle_r);
+    let mut img = ImageBuffer::from_fn(width, height, |px, py| {
+        let x: f64 = (px as i32 - (width / 2) as i32) as f64;
+        let y: f64 = (-(py as i32) + (height / 2) as i32) as f64;
+        let theta = {
+            let mut theta = (y / x).atan();
+            if x == 0.0 {
+                theta = 0.0;
+            }
+            if x < 0.0 {
+                theta += PI;
+            }
+            if theta < 0.0 {
+                theta = theta + PI + PI;
+            }
+            theta = theta + PI / 7.23;
+            if theta > 2.0 * PI {
+                theta = theta - 2.0 * PI;
+            }
+            theta
+        };
+        let r = (x * x + y * y).sqrt();
         
-//         let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
-//         let r = r + theta / (2.0*PI); // add spiral between tiers
-//         let steps = (r / circle_r).ceil() as usize;
-//         let p = {
-//             if steps == 0 {
-//                 0
-//             } else if steps > seqlen {
-//                 0
-//             } else {
-//                 let seq = coords_to_seq(theta, r);
-//                 let v = get(&bm, seq.as_bytes());
-//                 let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-//                 (normalized.sqrt().sqrt() * 255.0) as u8
-//             }
-//         };
-//         // println!(
-//         //     "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} p={}",
-//         //     px, py, x, y, r, theta, seq, p
-//         // );
+        let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
+        let r = r + theta / (2.0*PI); // add spiral between tiers
+        let steps = (r / circle_r).ceil() as usize;
+        let p = {
+            if steps == 0 {
+                0
+            } else if steps > seqlen {
+                0
+            } else {
+                let seq = coords_to_seq(theta, r);
+                let v = get(&m, seq.as_bytes());
+                let normalized = v as f64 / maxes[seq.len() - 1] as f64;
+                (normalized.sqrt().sqrt() * 255.0) as u8
+            }
+        };
+        // println!(
+        //     "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} p={}",
+        //     px, py, x, y, r, theta, seq, p
+        // );
 
-//         image::Luma([p])
-//     });
-//     img.save_with_format("out.png", image::ImageFormat::Png)
-//         .expect("while writing image");
-// }
+        image::Luma([p])
+    });
+    img.save_with_format("out.png", image::ImageFormat::Png)
+        .expect("while writing image");
+    Ok(())
+}
 
 fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Result<()> {
     let mut b = make_buf(outpath, seqlen)?;
