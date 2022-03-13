@@ -289,8 +289,8 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
             max
         })
         .collect();
-    let width = 4000;
-    let height = 4000;
+    let width = 16000;
+    let height = 16000;
     let circle_r = width as f64 / (1450.0);
     let coords_to_seq = make_coords_to_seq(circle_r);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
