@@ -416,10 +416,15 @@ fn seqlen_from_position(width: usize, height: usize, x: u32, y: u32, max_seqlen:
     let x: i32 = x as i32 - (width / 2) as i32;
     let y: i32 = y as i32 - (height / 2) as i32;
     let r = ((x * x + y * y) as f64).sqrt();
+    let max = width as f64;
+    let p = r / max;
+    let p = p * p; // express smaller radii less
 
-    let max = width as f64 / max_seqlen as f64 / 2.0;
+    (p * max_seqlen as f64).floor() as usize + 1
 
-    ((r / max).floor() as usize + 1).min(max_seqlen)
+    // let max = width as f64 / max_seqlen as f64 / 2.0;
+
+    // ((r / max).floor() as usize + 1).min(max_seqlen)
 }
 
 fn make_coords_to_seq_range(width: usize, height: usize, max_seqlen: usize) -> Box<dyn Fn(u32, u32) -> (String, String)> {
@@ -449,8 +454,8 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     // let size = buf_size_bytes(seqlen);
     let m = Mmap::open(index_file)?;
     println!("creating image");
-    let width = 255;
-    let height = 255;
+    let width = 4000;
+    let height = 4000;
     let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
     let mut buf: Vec<u64> = vec![0; width * height];
     let mut maxes: Vec<u64> = vec![0; seqlen + 1];
@@ -458,7 +463,13 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     println!("creating count buffer");
     for y in 0..height {
         for x in 0..width {
+            // let tx: i32 = x as i32 - (width / 2) as i32;
+            // let ty: i32 = y as i32 - (height / 2) as i32;
             let (min, max) = seqrange(x as u32, y as u32);
+            // if (-3 < tx && tx < 3) || (-3 < ty && ty < 3) {
+            //     // println!("{} {}", min, max);
+            //     continue
+            // }
             let len = min.len();
             let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
             buf[y * width + x] = c;
