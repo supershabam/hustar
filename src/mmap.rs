@@ -22,6 +22,14 @@ impl Mmap {
             mmap: mmap,
         })
     }
+
+    pub fn count(&self, min_inclusive: usize, max_inclusive: usize) -> u64 {
+        let mut c = 0;
+        for idx in min_inclusive..=max_inclusive {
+            c = c + self[idx];
+        }
+        c
+    }
 }
 
 impl Index<usize> for Mmap {

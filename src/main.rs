@@ -169,6 +169,17 @@ fn inc(m: &mut Mmap, seq: &[u8]) {
     }
 }
 
+fn seq_to_idx(seq: &[u8]) -> usize {
+    let unit: u64 = 4;
+    let mut base: usize = 0;
+    for l in 1..=seq.len() {
+        base += unit.pow(l as u32) as usize;
+    }
+    let addr = seq_to_bits(seq) as usize;
+    let idx = base + addr;
+    idx
+}
+
 fn get(m: &Mmap, seq: &[u8]) -> u64 {
     let unit: u64 = 4;
     let mut base: usize = 0;
@@ -438,65 +449,13 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     let size = buf_size_bytes(seqlen);
     let m = Mmap::new(index_file, size)?;
     println!("creating image");
-    let maxes: Vec<u64> = (1..=seqlen)
-        .into_iter()
-        .map(|l| {
-            let (start, end) = seqlen_to_bitmap_range(l);
-            let mut max = 0;
-            for idx in start..end {
-                if m[idx] > max {
-                    max = m[idx]
-                }
-            }
-            max
-        })
-        .collect();
-    let width = 16000;
-    let height = 16000;
-    let circle_r = width as f64 / (1450.0);
-    let coords_to_seq = make_coords_to_seq(circle_r);
+    let width = 255;
+    let height = 255;
+    let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
-        let x: f64 = (px as i32 - (width / 2) as i32) as f64;
-        let y: f64 = (-(py as i32) + (height / 2) as i32) as f64;
-        let theta = {
-            let mut theta = (y / x).atan();
-            if x == 0.0 {
-                theta = 0.0;
-            }
-            if x < 0.0 {
-                theta += PI;
-            }
-            if theta < 0.0 {
-                theta = theta + PI + PI;
-            }
-            theta = theta + PI / 7.23;
-            if theta > 2.0 * PI {
-                theta = theta - 2.0 * PI;
-            }
-            theta
-        };
-        let r = (x * x + y * y).sqrt();
-        
-        let r = r.sqrt(); // make tiers closer to the origin smaller than extremities
-        // let r = r + theta / (2.0*PI); // add spiral between tiers
-        let steps = (r / circle_r).ceil() as usize;
-        let p = {
-            if steps == 0 {
-                0
-            } else if steps > seqlen {
-                0
-            } else {
-                let seq = coords_to_seq(theta, r);
-                let v = get(&m, seq.as_bytes());
-                let normalized = v as f64 / maxes[seq.len() - 1] as f64;
-                (normalized.sqrt().sqrt().sqrt() * 255.0) as u8
-            }
-        };
-        // println!(
-        //     "pixel ({}, {}) xy ({}, {}) r={} theta={} seq={} p={}",
-        //     px, py, x, y, r, theta, seq, p
-        // );
-
+        let (min, max) = seqrange(px, py);
+        let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
+        let p: u8 = (c as f64 / u32::MAX as f64) as u8;
         image::Luma([p])
     });
     img.save_with_format("out.png", image::ImageFormat::Png)
