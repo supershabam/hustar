@@ -456,8 +456,8 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     let mut maxes: Vec<u64> = vec![0; seqlen + 1];
     let mut maxesbuf: Vec<u64> = vec![0; width * height];
     println!("creating count buffer");
-    for x in 0..width {
-        for y in 0..height {
+    for y in 0..height {
+        for x in 0..width {
             let (min, max) = seqrange(x as u32, y as u32);
             let len = min.len();
             let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
@@ -466,10 +466,11 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
                 maxes[len] = c;
             }
         }
+        println!("completed row {}", y)
     }
     println!("creating maxes buffer");
-    for x in 0..width {
-        for y in 0..height {
+    for y in 0..height {
+        for x in 0..width {
             let seqlen = seqlen_from_position(width, height, x as u32, y as u32, seqlen);
             maxesbuf[y * height + x] = maxes[seqlen];
         }
