@@ -467,13 +467,14 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     println!("creating count buffer");
     for y in 0..height {
         for x in 0..width {
-            // let tx: i32 = x as i32 - (width / 2) as i32;
-            // let ty: i32 = y as i32 - (height / 2) as i32;
+            let tx: i32 = x as i32 - (width / 2) as i32;
+            let ty: i32 = y as i32 - (height / 2) as i32;
             let (min, max) = seqrange(x as u32, y as u32);
-            // if (-3 < tx && tx < 3) || (-3 < ty && ty < 3) {
-            //     // println!("{} {}", min, max);
-            //     continue
-            // }
+            if (-3 < tx && tx < 3) || (-3 < ty && ty < 3) {
+                // println!("{} {}", min, max);
+                // TODO figure out why bright lines are forming on axis
+                continue
+            }
             let len = min.len();
             let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
             buf[y * width + x] = c;
