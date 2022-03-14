@@ -513,12 +513,14 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     drop(tx);
     let mut last = Instant::now();
     let mut counter = 0;
-    while let Ok((x, y, c, len)) = rx.recv() {
-        buf[y * width + x] = c;
-        if maxes[len] < c {
-            maxes[len] = c;
+    let mut count_sequences = 0;
+    while let Ok((x, y, (count, count_unique_sequences), len)) = rx.recv() {
+        buf[y * width + x] = count;
+        if maxes[len] < count {
+            maxes[len] = count;
         }
         counter = counter + 1;
+        count_sequences += count_unique_sequences;
         let now = Instant::now();
         if now.duration_since(last) > Duration::from_secs_f64(2.3) {
             last = now;
@@ -527,6 +529,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             println!("processed {} pixels of {} ({:.2}%)", counter, total, percentage);
         }
     }
+    println!("visited {} sequences", count_sequences);
     println!("creating maxes buffer");
     for y in 0..height {
         for x in 0..width {

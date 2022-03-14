@@ -41,12 +41,12 @@ impl Mmap {
          })
     }
 
-    pub fn count(&self, min_inclusive: usize, max_inclusive: usize) -> u64 {
+    pub fn count(&self, min_inclusive: usize, max_inclusive: usize) -> (u64, u64) {
         let mut c = 0;
         for idx in min_inclusive..=max_inclusive {
             c = c + self[idx];
         }
-        c
+        (c, max_inclusive as u64 - min_inclusive as u64 + 1)
     }
 }
 
