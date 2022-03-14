@@ -1,5 +1,5 @@
+use core::ops::{Index, IndexMut};
 use std::fs::{File, OpenOptions};
-use core::ops::{Index,IndexMut};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -18,9 +18,17 @@ impl Mmap {
             .open(&path.into())?;
         file.set_len(size)?;
         let mmap = unsafe { MmapMut::map_mut(&file)? };
-        Ok(Mmap { 
-            mmap: mmap,
-        })
+        Ok(Mmap { mmap: mmap })
+    }
+
+    pub fn open<P: Into<PathBuf>>(path: P) -> Result<Mmap> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
+            .open(&path.into())?;
+        let mmap = unsafe { MmapMut::map_mut(&file)? };
+        Ok(Mmap { mmap: mmap })
     }
 
     pub fn count(&self, min_inclusive: usize, max_inclusive: usize) -> u64 {

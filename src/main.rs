@@ -438,7 +438,7 @@ fn main() {
             create(fasta_file, index_file, *sequence_length);
         },
         Commands::Visualize { index_file, sequence_length } => {
-            print(index_file, *sequence_length);
+            print(index_file, *sequence_length).expect("while printing");
         },
         _ => panic!("oh no"),
     }
@@ -446,8 +446,8 @@ fn main() {
 
 fn print(index_file: &str, seqlen: usize) -> Result<()> {
     println!("opening {}", index_file);
-    let size = buf_size_bytes(seqlen);
-    let m = Mmap::new(index_file, size)?;
+    // let size = buf_size_bytes(seqlen);
+    let m = Mmap::open(index_file)?;
     println!("creating image");
     let width = 255;
     let height = 255;
