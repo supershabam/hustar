@@ -481,6 +481,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
         let c = buf[y * width + x];
         let t = maxesbuf[y * height + x];
         let p = c as f64 / t as f64;
+        let p = p.sqrt().sqrt();
         let l = (p * 255.0) as u8;
         image::Luma([l])
     });
