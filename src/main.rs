@@ -237,6 +237,15 @@ mod tests {
 
         assert_eq!(min, 0.0);
         assert_eq!(max, PI/2.0);
+
+        let width = 200;
+        let height = 200;
+        let x = 110;
+        let y = 145;
+        let (min, max) = min_max_thetas(width, height, x, y);
+
+        assert_eq!(min, 1.33105321792444);
+        assert_eq!(max, 1.356735643231075);
     }
 }
 
@@ -281,10 +290,8 @@ fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
         (x, y + 1),
         (x + 1, y + 1),
     ].iter().fold((None, None), |(min, max), (x, y)| {
-        println!("({},{})", x, y);
         let x: i32 = *x as i32 - (width / 2) as i32;
         let y: i32 = *y as i32 - (height / 2) as i32;
-        println!("({},{})", x, y);
         let theta = {
             let mut theta = (y as f64 / x as f64).atan();
             if x == 0 {
@@ -304,8 +311,6 @@ fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
             // }
             theta
         };
-        println!("{}", theta);
-        println!("{:?} {:?}", min, max);
         let min = match min {
             Some(current) => {
                 if current < theta {
@@ -326,7 +331,6 @@ fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
             },
             None => Some(theta),
         };
-        println!("{:?} {:?}", min, max);
         (min, max)
     });
     let min_theta = min_theta.unwrap();
