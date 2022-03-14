@@ -172,7 +172,7 @@ fn inc(m: &mut Mmap, seq: &[u8]) {
 fn seq_to_idx(seq: &[u8]) -> usize {
     let unit: u64 = 4;
     let mut base: usize = 0;
-    for l in 1..=seq.len() {
+    for l in 1..seq.len() {
         base += unit.pow(l as u32) as usize;
     }
     let addr = seq_to_bits(seq) as usize;
@@ -455,7 +455,7 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     let mut img = ImageBuffer::from_fn(width, height, |px, py| {
         let (min, max) = seqrange(px, py);
         let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
-        let p: u8 = (c as f64 / u32::MAX as f64) as u8;
+        let p: u8 = (c as f64 / 0xffff as f64) as u8;
         image::Luma([p])
     });
     img.save_with_format("out.png", image::ImageFormat::Png)
