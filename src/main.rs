@@ -49,6 +49,7 @@ enum Commands {
     Visualize {
         index_file: String,
         sequence_length: usize,
+        side_length: usize,
     },
 }
 
@@ -446,20 +447,20 @@ fn main() {
         Commands::Build { fasta_file, index_file, sequence_length} => {
             create(fasta_file, index_file, *sequence_length);
         },
-        Commands::Visualize { index_file, sequence_length } => {
-            print(index_file, *sequence_length).expect("while printing");
+        Commands::Visualize { index_file, sequence_length, side_length } => {
+            print(index_file, *sequence_length, *side_length).expect("while printing");
         },
         _ => panic!("oh no"),
     }
 }
 
-fn print(index_file: &str, seqlen: usize) -> Result<()> {
+fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     println!("opening {}", index_file);
     // let size = buf_size_bytes(seqlen);
     let m = Mmap::open(index_file)?;
     println!("creating image");
-    let width = 4000;
-    let height = 4000;
+    let width = side_length;
+    let height = side_length;
     let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
     let mut buf: Vec<u64> = vec![0; width * height];
     let mut maxes: Vec<u64> = vec![0; seqlen + 1];
