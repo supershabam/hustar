@@ -226,6 +226,18 @@ mod tests {
         assert_eq!(seqlen_to_bitmap_range(2), (4, 20));
         assert_eq!(seqlen_to_bitmap_range(3), (20, 84));
     }
+
+    #[test]
+    fn test_min_max_thetas() {
+        let width = 2;
+        let height = 2;
+        let x = 1;
+        let y = 1;
+        let (min, max) = min_max_thetas(width, height, x, y);
+
+        assert_eq!(min, 0.0);
+        assert_eq!(max, PI/2.0);
+    }
 }
 
 fn seq_to_angle(seq: &[u8]) -> f64 {
@@ -255,6 +267,79 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
         }
         let seq = bits_to_seq(bits, bitsize);
         seq
+    })
+}
+
+fn sequence_from_angle(theta: f64, seqlen: usize) -> String {
+    panic!("not impl");
+}
+
+fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
+    let (min_theta, max_theta) = vec![
+        (x, y),
+        (x + 1, y),
+        (x, y + 1),
+        (x + 1, y + 1),
+    ].iter().fold((None, None), |(min, max), (x, y)| {
+        println!("({},{})", x, y);
+        let x: i32 = *x as i32 - (width / 2) as i32;
+        let y: i32 = *y as i32 - (height / 2) as i32;
+        println!("({},{})", x, y);
+        let theta = {
+            let mut theta = (y as f64 / x as f64).atan();
+            if x == 0 {
+                theta = PI / 2.0;
+            }
+            if x < 0 {
+                theta += PI;
+            }
+            if theta < 0.0 {
+                theta = theta + PI + PI;
+            }
+            // rotate for effect; note, this complicates the assumptions on min/max for angles
+            // however, a min-max on sequence could still be done.
+            // theta = theta + PI / 7.23;
+            // if theta > 2.0 * PI {
+            //     theta = theta - 2.0 * PI;
+            // }
+            theta
+        };
+        println!("{}", theta);
+        println!("{:?} {:?}", min, max);
+        let min = match min {
+            Some(current) => {
+                if current < theta {
+                    Some(current)
+                } else {
+                    Some(theta)
+                }
+            },
+            None => Some(theta),
+        };
+        let max = match max {
+            Some(current) => {
+                if current < theta {
+                    Some(theta)
+                } else {
+                    Some(current)
+                }
+            },
+            None => Some(theta),
+        };
+        println!("{:?} {:?}", min, max);
+        (min, max)
+    });
+    let min_theta = min_theta.unwrap();
+    let max_theta = max_theta.unwrap();
+    (min_theta, max_theta)
+}
+
+fn make_coords_to_seq_range(width: usize, height: usize, max_seqlen: usize) -> Box<dyn Fn(u32, u32) -> (String, String)> {
+    Box::new(move |x, y| -> (String, String) {
+        // calculate all angles for the square and choose the min and max
+        let (min_theta, max_theta) = min_max_thetas(width, height, x, y);
+        let seqlen = 3; // TODO create from x,y
+        (sequence_from_angle(min_theta, seqlen),sequence_from_angle(max_theta, seqlen))
     })
 }
 
