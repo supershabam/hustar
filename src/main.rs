@@ -420,7 +420,7 @@ fn seqlen_from_position(width: usize, height: usize, x: u32, y: u32, max_seqlen:
     let p = r / max;
     // println!("r={} max={} p={}", r, max, p);
     let p = p.min(1.0);
-    let p = p.sqrt(); // express smaller radii less
+    let p = p.sqrt().sqrt(); // express smaller radii less
     let interp = p * max_seqlen as f64;
     // println!("p={} max_seqlen={} interp={}", p, max_seqlen, interp);
     interp.ceil().max(1.0) as usize
