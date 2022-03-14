@@ -247,6 +247,33 @@ mod tests {
         assert_eq!(min, 1.33105321792444);
         assert_eq!(max, 1.356735643231075);
     }
+
+    #[test]
+    fn test_seqlen_from_position() {
+        let width = 200;
+        let height = 200;
+        let x = 100;
+        let y = 100;
+        let seqlen = seqlen_from_position(width, height, x, y, 90);
+
+        assert_eq!(seqlen, 1);
+
+        let width = 200;
+        let height = 200;
+        let x = 200;
+        let y = 100;
+        let seqlen = seqlen_from_position(width, height, x, y, 90);
+
+        assert_eq!(seqlen, 90);
+
+        let width = 200;
+        let height = 200;
+        let x = 190;
+        let y = 100;
+        let seqlen = seqlen_from_position(width, height, x, y, 100);
+
+        assert_eq!(seqlen, 91);
+    }
 }
 
 fn seq_to_angle(seq: &[u8]) -> f64 {
@@ -336,6 +363,16 @@ fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
     let min_theta = min_theta.unwrap();
     let max_theta = max_theta.unwrap();
     (min_theta, max_theta)
+}
+
+fn seqlen_from_position(width: usize, height: usize, x: u32, y: u32, max_seqlen: usize) -> usize {
+    let x: i32 = x as i32 - (width / 2) as i32;
+    let y: i32 = y as i32 - (height / 2) as i32;
+    let r = ((x * x + y * y) as f64).sqrt();
+
+    let max = width as f64 / max_seqlen as f64 / 2.0;
+
+    ((r / max).floor() as usize + 1).min(max_seqlen)
 }
 
 fn make_coords_to_seq_range(width: usize, height: usize, max_seqlen: usize) -> Box<dyn Fn(u32, u32) -> (String, String)> {
