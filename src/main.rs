@@ -452,11 +452,37 @@ fn print(index_file: &str, seqlen: usize) -> Result<()> {
     let width = 255;
     let height = 255;
     let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
-    let mut img = ImageBuffer::from_fn(width, height, |px, py| {
-        let (min, max) = seqrange(px, py);
-        let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
-        let p: u8 = (c as f64 / 0xffff as f64) as u8;
-        image::Luma([p])
+    let mut buf: Vec<u64> = vec![0; width * height];
+    let mut maxes: Vec<u64> = vec![0; seqlen + 1];
+    let mut maxesbuf: Vec<u64> = vec![0; width * height];
+    println!("creating count buffer");
+    for x in 0..width {
+        for y in 0..height {
+            let (min, max) = seqrange(x as u32, y as u32);
+            let len = min.len();
+            let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
+            buf[y * width + x] = c;
+            if maxes[len] < c {
+                maxes[len] = c;
+            }
+        }
+    }
+    println!("creating maxes buffer");
+    for x in 0..width {
+        for y in 0..height {
+            let seqlen = seqlen_from_position(width, height, x as u32, y as u32, seqlen);
+            maxesbuf[y * height + x] = maxes[seqlen];
+        }
+    }
+    println!("creating image buffer");
+    let mut img = ImageBuffer::from_fn(width as u32, height as u32, |x, y| {
+        let x= x as usize;
+        let y = y as usize;
+        let c = buf[y * width + x];
+        let t = maxesbuf[y * height + x];
+        let p = c as f64 / t as f64;
+        let l = (p * 255.0) as u8;
+        image::Luma([l])
     });
     img.save_with_format("out.png", image::ImageFormat::Png)
         .expect("while writing image");
