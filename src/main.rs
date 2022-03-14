@@ -471,7 +471,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             let tx: i32 = x as i32 - (width / 2) as i32;
             let ty: i32 = y as i32 - (height / 2) as i32;
             let (min, max) = seqrange(x as u32, y as u32);
-            if (-3 < tx && tx < 3) || (-3 < ty && ty < 3) {
+            if (-1 < tx && tx < 1) || (-1 < ty && ty < 1) {
                 // println!("{} {}", min, max);
                 // TODO figure out why bright lines are forming on axis
                 continue
