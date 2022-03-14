@@ -274,6 +274,31 @@ mod tests {
 
         assert_eq!(seqlen, 91);
     }
+
+    #[test]
+    fn test_make_coords_to_seq_range() {
+        let width = 200;
+        let height = 200;
+        let max_seqlen = 3;
+        let x = 190;
+        let y = 100;
+        let f = make_coords_to_seq_range(width, height, max_seqlen);
+        let (start, end) = f(x, y);
+
+        assert_eq!(start, "aaa");
+        assert_eq!(end, "aaa");
+
+        let width = 200;
+        let height = 200;
+        let max_seqlen = 20;
+        let x = 200;
+        let y = 100;
+        let f = make_coords_to_seq_range(width, height, max_seqlen);
+        let (start, end) = f(x, y);
+
+        assert_eq!(start, "aaaaaaaaaaaaaaaaaaaa");
+        assert_eq!(end, "aaaacggacatatgaatggg");
+    }
 }
 
 fn seq_to_angle(seq: &[u8]) -> f64 {
@@ -307,7 +332,18 @@ fn make_coords_to_seq(r_step: f64) -> Box<dyn Fn(f64, f64) -> String> {
 }
 
 fn sequence_from_angle(theta: f64, seqlen: usize) -> String {
-    panic!("not impl");
+    let mut slice = 2.0 * PI / 4.0; // current width
+    let mut bits: u64 = 0;
+    let mut bitsize: usize = 0;
+    for _ in 0..seqlen {
+        let f = theta / slice;
+        let tail = (f.floor() as u64) % 4;
+        bits = bits << 2;
+        bits = bits | tail;
+        bitsize += 1;
+        slice = slice / 4.0;
+    }
+    bits_to_seq(bits, bitsize)
 }
 
 fn min_max_thetas(width: usize, height: usize, x: u32, y: u32) -> (f64, f64) {
@@ -379,7 +415,7 @@ fn make_coords_to_seq_range(width: usize, height: usize, max_seqlen: usize) -> B
     Box::new(move |x, y| -> (String, String) {
         // calculate all angles for the square and choose the min and max
         let (min_theta, max_theta) = min_max_thetas(width, height, x, y);
-        let seqlen = 3; // TODO create from x,y
+        let seqlen = seqlen_from_position(width, height, x, y, max_seqlen);
         (sequence_from_angle(min_theta, seqlen),sequence_from_angle(max_theta, seqlen))
     })
 }
