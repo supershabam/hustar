@@ -283,7 +283,7 @@ mod tests {
         let y = 100;
         let seqlen = seqlen_from_position(width, height, x, y, 100);
 
-        assert_eq!(seqlen, 91);
+        assert_eq!(seqlen, 95);
     }
 
     #[test]
@@ -416,11 +416,15 @@ fn seqlen_from_position(width: usize, height: usize, x: u32, y: u32, max_seqlen:
     let x: i32 = x as i32 - (width / 2) as i32;
     let y: i32 = y as i32 - (height / 2) as i32;
     let r = ((x * x + y * y) as f64).sqrt();
-    let max = width as f64;
+    let max = width as f64 / 2.0;
     let p = r / max;
-    let p = p * p; // express smaller radii less
-
-    (p * max_seqlen as f64).floor() as usize + 1
+    // println!("r={} max={} p={}", r, max, p);
+    let p = p.min(1.0);
+    let p = p.sqrt(); // express smaller radii less
+    let interp = p * max_seqlen as f64;
+    // println!("p={} max_seqlen={} interp={}", p, max_seqlen, interp);
+    interp.ceil().max(1.0) as usize
+    // (p * max_seqlen as f64).ceil().min(1.0) as usize
 
     // let max = width as f64 / max_seqlen as f64 / 2.0;
 
