@@ -1,5 +1,6 @@
 use core::ops::{Index, IndexMut};
 use std::fs::{File, OpenOptions};
+use std::iter::Cloned;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -7,28 +8,37 @@ use memmap2::MmapMut;
 
 pub struct Mmap {
     mmap: MmapMut,
+    path: String,
 }
 
 impl Mmap {
     pub fn new<P: Into<PathBuf>>(path: P, size: u64) -> Result<Mmap> {
+        let path = path.into();
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(&path.into())?;
+            .open(&path)?;
         file.set_len(size)?;
         let mmap = unsafe { MmapMut::map_mut(&file)? };
-        Ok(Mmap { mmap: mmap })
+        Ok(Mmap { 
+            mmap: mmap,
+            path: path.into_os_string().into_string().expect("creating path"),
+         })
     }
 
     pub fn open<P: Into<PathBuf>>(path: P) -> Result<Mmap> {
+        let path = path.into();
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(false)
-            .open(&path.into())?;
+            .open(&path)?;
         let mmap = unsafe { MmapMut::map_mut(&file)? };
-        Ok(Mmap { mmap: mmap })
+        Ok(Mmap {
+            mmap: mmap,
+            path: path.into_os_string().into_string().expect("creating path"),
+         })
     }
 
     pub fn count(&self, min_inclusive: usize, max_inclusive: usize) -> u64 {
@@ -37,6 +47,13 @@ impl Mmap {
             c = c + self[idx];
         }
         c
+    }
+}
+
+impl Clone for Mmap {
+    fn clone(&self) -> Self {
+        let next = Self::open(self.path.clone()).expect("oops");
+        next
     }
 }
 
