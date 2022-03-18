@@ -2,6 +2,7 @@ mod encoding;
 mod window;
 
 mod mmap;
+mod traverse;
 
 use mmap::Mmap;
 
