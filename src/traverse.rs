@@ -10,7 +10,7 @@ struct Point {
     seqlen: usize,
 }
 
-fn delta_theta(t1: f64, t2: f64) -> (f64, f64) {
+fn theta_delta(t1: f64, t2: f64) -> (f64, f64) {
   // assert t1 <= 2PI && t2 <= 2PI
   let mut counterclockwise = t2 - t1;
   if counterclockwise < 0.0 {
@@ -56,10 +56,10 @@ impl Point {
         let td = thetas.iter().permutations(2).fold((0.0, 0.0), |acc, t| {
           match t[..] {
             [&a, &b] => {
-              let dt = delta_theta(a, b);
+              let td = theta_delta(a, b);
               // select maximum distance
-              if dt.1 > acc.1 {
-                dt
+              if td.1 > acc.1 {
+                td
               } else {
                 acc
               }
@@ -157,7 +157,7 @@ mod test {
     }
 
     #[test]
-    fn test_delta_theta() {
-      assert_eq!((0.0, 0.0), delta_theta(0.0, 0.0))
+    fn test_theta_delta() {
+      assert_eq!((0.0, 0.0), theta_delta(0.0, 0.0))
     }
 }
