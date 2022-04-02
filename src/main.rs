@@ -4,6 +4,7 @@ mod window;
 mod accumulator;
 mod mmap;
 mod traverse;
+mod database;
 
 use mmap::Mmap;
 
