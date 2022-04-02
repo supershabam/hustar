@@ -1,11 +1,14 @@
 use anyhow::Result;
 use core::ops::{Index, IndexMut};
-use memmap2::MmapMut;
+use memmap2::{Mmap, MmapMut};
 use std::path::PathBuf;
 
 pub struct DatabaseMut {
     mmap: MmapMut,
-    seqlen: usize,
+}
+
+pub struct Database {
+    mmap: Mmap,
 }
 
 fn buf_size_bytes(seqlen: usize) -> u64 {
@@ -58,7 +61,7 @@ impl DatabaseMut {
             .open(&path)?;
         file.set_len(size)?;
         let mmap = unsafe { MmapMut::map_mut(&file)? };
-        Ok(DatabaseMut { mmap: mmap, seqlen })
+        Ok(DatabaseMut { mmap })
     }
 }
 
@@ -90,4 +93,35 @@ impl IndexMut<usize> for DatabaseMut {
         let (_, buf, _) = unsafe { self.mmap.align_to_mut::<u64>() };
         &mut buf[index]
     }
+}
+
+impl Database {
+    pub fn open<P: Into<PathBuf>>(path: P) -> Result<Database> {
+        use std::fs::OpenOptions;
+
+        let path = path.into();
+        let file = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .create(false)
+            .open(&path)?;
+        let mmap = unsafe { Mmap::map(&file)? };
+        Ok(Database { mmap })
+    }
+}
+
+impl Index<&str> for Database {
+  type Output = u64;
+  fn index(&self, seq: &str) -> &Self::Output {
+      let index = seq_to_index(seq);
+      &self[index]
+  }
+}
+
+impl Index<usize> for Database {
+  type Output = u64;
+  fn index(&self, index: usize) -> &Self::Output {
+      let (_, buf, _) = unsafe { self.mmap.align_to::<u64>() };
+      &buf[index]
+  }
 }
