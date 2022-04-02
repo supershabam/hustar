@@ -32,6 +32,8 @@ use zerocopy::LayoutVerified;
 use clap::{Parser, Subcommand};
 use std::sync::mpsc::channel;
 
+use crate::traverse::make_points;
+
 #[derive(Parser)]
 #[clap(name = "hustar")]
 #[clap(about = "builds subsequence frequency index of genomic data", long_about = None)]
@@ -478,31 +480,40 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let width = side_length;
     let height = side_length;
 
+    let pixels = make_points(width as u32, height as u32);
+    let chunk_size = pixels.len() / thread_count;
+    let chunks = pixels.chunks(chunk_size);
+
     let (tx, rx) = channel();
     for worker_id in 0..thread_count {
         let tx = tx.clone();
+        // let pixels = pixel[worker_id].clone();
         let m = m.clone();
         thread::spawn(move || {
-            let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
-            for y in 0..height {
-                for x in 0..width {
-                    if x % thread_count != worker_id {
-                        continue;
-                    }
-                    let testx: i32 = x as i32 - (width / 2) as i32;
-                    let testy: i32 = y as i32 - (height / 2) as i32;
-                    if (-3 < testx && testx < 3) || (-3 < testy && testy < 3) {
-                        // println!("{} {}", min, max);
-                        // TODO figure out why bright lines are forming on axis
-                        continue;
-                    }
-                    let (min, max) = seqrange(x as u32, y as u32);
+            // for p in pixels {
 
-                    let len = min.len();
-                    let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
-                    tx.send((x, y, c, len)).unwrap();
-                }
-            }
+            // }
+            // let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
+            // for y in 0..height {
+            //     for x in 0..width {
+            //         if x % thread_count != worker_id {
+            //             continue;
+            //         }
+            //         let testx: i32 = x as i32 - (width / 2) as i32;
+            //         let testy: i32 = y as i32 - (height / 2) as i32;
+            //         if (-3 < testx && testx < 3) || (-3 < testy && testy < 3) {
+            //             // println!("{} {}", min, max);
+            //             // TODO figure out why bright lines are forming on axis
+            //             continue;
+            //         }
+            //         let (min, max) = seqrange(x as u32, y as u32);
+
+            //         let len = min.len();
+            //         let c = m.count(seq_to_idx(min.as_bytes()), seq_to_idx(max.as_bytes()));
+            //         tx.send((x, y, c, len)).unwrap();
+            //     }
+            // }
+            tx.send((0, 0, (0, 0), 0)).unwrap();
             println!("worker_id={} exiting", worker_id)
         });
     }

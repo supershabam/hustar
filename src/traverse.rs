@@ -4,7 +4,8 @@
 use core::f64::consts::PI;
 use itertools::Itertools;
 
-struct Point {
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
     x: i32,
     y: i32,
     seqlen: usize,
@@ -26,6 +27,33 @@ fn theta_delta(t1: f64, t2: f64) -> (f64, f64) {
   } else {
     (t1, counterclockwise)
   }
+}
+
+pub fn make_points(width: u32, height: u32) -> Vec<Point> {
+  let mut points: Vec<Point> = Vec::with_capacity(width as usize * height as usize);
+  for w in 0..width {
+    for h in 0..height {
+      let x = width as i32 / 2 - w as i32;
+      let y = height as i32 / 2 - h as i32;
+      points.push(Point { x: x, y: y, seqlen: 3 });
+    }
+  }
+  points.sort_by(|a, b| {
+    match a.seqlen.cmp(&b.seqlen) {
+      std::cmp::Ordering::Equal => {
+        let ar = a.index_range();
+        let br = b.index_range();
+        match ar.0.cmp(&br.0) {
+          std::cmp::Ordering::Equal => {
+            ar.1.cmp(&br.1)
+          },
+          ord => ord,
+        }
+      },
+      ord => ord,
+    }
+  });
+  points
 }
 
 impl Point {
@@ -159,5 +187,15 @@ mod test {
     #[test]
     fn test_theta_delta() {
       assert_eq!((0.0, 0.0), theta_delta(0.0, 0.0))
+    }
+
+    #[test]
+    fn test_make_points() {
+      let points = make_points(10, 10);
+      for p in &points {
+        println!("point={:?} range={:?}", p, p.index_range());
+      }
+      // println!("points={:?}", points);
+      assert!(false);
     }
 }
