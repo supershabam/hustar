@@ -1,6 +1,7 @@
 mod encoding;
 mod window;
 
+mod accumulator;
 mod mmap;
 mod traverse;
 
@@ -32,6 +33,7 @@ use zerocopy::LayoutVerified;
 use clap::{Parser, Subcommand};
 use std::sync::mpsc::channel;
 
+use crate::accumulator::Accumulator;
 use crate::traverse::make_points;
 
 #[derive(Parser)]
@@ -472,6 +474,7 @@ fn main() {
 fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let cpus = num_cpus::get();
     let thread_count = cpus;
+    let thread_count = 1;
 
     println!("printing {} with thread_count={}", index_file, thread_count);
     // let size = buf_size_bytes(seqlen);
@@ -480,19 +483,29 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let width = side_length;
     let height = side_length;
 
-    let pixels = make_points(width as u32, height as u32);
+    let pixels = make_points(width as u32, height as u32, seqlen as u32);
     let chunk_size = pixels.len() / thread_count;
     let chunks = pixels.chunks(chunk_size);
 
     let (tx, rx) = channel();
     for worker_id in 0..thread_count {
         let tx = tx.clone();
-        // let pixels = pixel[worker_id].clone();
         let m = m.clone();
+        let pixels = pixels.clone();
         thread::spawn(move || {
-            // for p in pixels {
-
-            // }
+            let mut acc = Accumulator::default();
+            for p in pixels {
+                let (gte, lt) = p.index_range();
+                let c = acc.sum_to(&m, gte, lt);
+                let val = (
+                    p.w as usize,
+                    p.h as usize,
+                    (c, lt - gte),
+                    p.seqlen,
+                );
+                // println!("sending point={:?} range=({}, {}) val={:?}", p, gte, lt, val);
+                tx.send(val).unwrap();
+            }
             // let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
             // for y in 0..height {
             //     for x in 0..width {
@@ -513,8 +526,8 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             //         tx.send((x, y, c, len)).unwrap();
             //     }
             // }
-            tx.send((0, 0, (0, 0), 0)).unwrap();
-            println!("worker_id={} exiting", worker_id)
+            // tx.send((0, 0, (0, 0), 0)).unwrap();
+            // println!("worker_id={} exiting", worker_id)
         });
     }
     println!("creating image");
@@ -538,7 +551,10 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             last = now;
             let total = width * height;
             let percentage = counter as f64 / total as f64 * 100.0;
-            println!("processed {} pixels of {} ({:.2}%)", counter, total, percentage);
+            println!(
+                "processed {} pixels of {} ({:.2}%)",
+                counter, total, percentage
+            );
         }
     }
     println!("visited {} sequences", count_sequences);
