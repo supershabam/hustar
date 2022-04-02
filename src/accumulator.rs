@@ -1,7 +1,4 @@
-use std::cmp::Ordering;
-use anyhow::Result;
-
-use crate::mmap::Mmap;
+use crate::database::Database;
 
 #[derive(Default)]
 pub struct Accumulator {
@@ -16,7 +13,9 @@ impl Accumulator {
   //
   // TODO: it is possible to do less work. Say for the case where the acc is at [0,5)
   // and then is requested to move to [9,25).
-  pub fn sum_to(&mut self, mmap: &Mmap, gte: usize, lt: usize) -> u64 {
+  pub fn sum_to(&mut self, mmap: &Database, gte: usize, lt: usize) -> u64 {
+    use std::cmp::Ordering;
+    
     loop {
       match self.lt.cmp(&lt) {
         Ordering::Less => {
@@ -63,7 +62,7 @@ mod test {
   fn test_accumulator() -> Result<()> {
     use crate::accumulator::*;
     let mut a = Accumulator::default();
-    let mmap = Mmap::open("seqlen=4.bin")?;
+    let mmap = Database::open("seqlen=4.bin")?;
     let c = a.sum_to(&mmap, 2, 3);
     println!("count = {c}");
     let c = a.sum_to(&mmap, 1, 2);

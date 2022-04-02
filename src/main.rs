@@ -1,32 +1,16 @@
 mod accumulator;
-mod mmap;
 mod traverse;
 mod database;
 
-use mmap::Mmap;
-
-use serde::{Deserialize, Serialize};
-
 use anyhow::Result;
-use binwrite::BinWrite;
-use bio::alphabets;
 use bio::io::fasta::Reader;
-use image::imageops::resize;
 use image::ImageBuffer;
-use show_image::{create_window, ImageInfo, ImageView};
+
 use std::f64::consts::PI;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 use std::{str, thread, time};
-
-use byteorder::BigEndian;
-use zerocopy::byteorder::U64;
-use zerocopy::LayoutVerified;
 
 use clap::{Parser, Subcommand};
 use std::sync::mpsc::channel;
@@ -146,12 +130,6 @@ inc(seq: &[u8])
   }
 */
 
-fn make_buf<'a, P: Into<PathBuf>>(path: P, seqlen: usize) -> Result<Mmap> {
-    let size = buf_size_bytes(seqlen);
-    let m = Mmap::new(path, size)?;
-    Ok(m)
-}
-
 fn buf_size_bytes(seqlen: usize) -> u64 {
     let base = 4_u64;
     let mut size = 0;
@@ -159,18 +137,6 @@ fn buf_size_bytes(seqlen: usize) -> u64 {
         size += base.pow(l as u32);
     }
     size * 8
-}
-
-fn inc(m: &mut Mmap, seq: &[u8]) {
-    let unit: u64 = 4;
-    let mut base: usize = 0;
-    for l in 1..=seq.len() {
-        let s = &seq[..l];
-        let addr = seq_to_bits(s) as usize;
-        let idx = base + addr;
-        m[idx] += 1;
-        base += unit.pow(l as u32) as usize;
-    }
 }
 
 fn seq_to_idx(seq: &[u8]) -> usize {
@@ -182,17 +148,6 @@ fn seq_to_idx(seq: &[u8]) -> usize {
     let addr = seq_to_bits(seq) as usize;
     let idx = base + addr;
     idx
-}
-
-fn get(m: &Mmap, seq: &[u8]) -> u64 {
-    let unit: u64 = 4;
-    let mut base: usize = 0;
-    for l in 1..seq.len() {
-        base += unit.pow(l as u32) as usize;
-    }
-    let addr = seq_to_bits(seq) as usize;
-    let idx = base + addr;
-    m[idx]
 }
 
 fn seqlen_to_bitmap_range(seqlen: usize) -> (usize, usize) {
@@ -470,13 +425,15 @@ fn main() {
 }
 
 fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
+    use crate::database::Database;
+
     let cpus = num_cpus::get();
     let thread_count = cpus;
     let thread_count = 1;
 
     println!("printing {} with thread_count={}", index_file, thread_count);
     // let size = buf_size_bytes(seqlen);
-    let m = Mmap::open(index_file)?;
+    let m = Database::open(index_file)?;
 
     let width = side_length;
     let height = side_length;
@@ -580,7 +537,9 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
 }
 
 fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Result<()> {
-    let mut b = make_buf(outpath, seqlen)?;
+    use crate::database;
+
+    let mut b = database::DatabaseMut::create(outpath, seqlen)?;
     let r = Reader::from_file(fasta_file).unwrap();
     let mut records = r.records();
     while let Some(Ok(record)) = records.next() {
@@ -592,7 +551,8 @@ fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Resu
         let log_modulus = 1_000_000;
         let i = record.seq().windows(seqlen).filter(filter_n);
         for (count, elem) in i.enumerate() {
-            inc(&mut b, elem);
+            let str = String::from_utf8(elem.to_vec())?;
+            b[str.as_str()] += 1;
             if count % log_modulus == 0 {
                 println!(
                     "inserted {} elements elapsed={:.02}s",

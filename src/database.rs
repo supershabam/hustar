@@ -9,6 +9,7 @@ pub struct DatabaseMut {
 
 pub struct Database {
     mmap: Mmap,
+    path: PathBuf,
 }
 
 fn buf_size_bytes(seqlen: usize) -> u64 {
@@ -106,22 +107,29 @@ impl Database {
             .create(false)
             .open(&path)?;
         let mmap = unsafe { Mmap::map(&file)? };
-        Ok(Database { mmap })
+        Ok(Database { mmap, path })
     }
 }
 
 impl Index<&str> for Database {
-  type Output = u64;
-  fn index(&self, seq: &str) -> &Self::Output {
-      let index = seq_to_index(seq);
-      &self[index]
-  }
+    type Output = u64;
+    fn index(&self, seq: &str) -> &Self::Output {
+        let index = seq_to_index(seq);
+        &self[index]
+    }
 }
 
 impl Index<usize> for Database {
-  type Output = u64;
-  fn index(&self, index: usize) -> &Self::Output {
-      let (_, buf, _) = unsafe { self.mmap.align_to::<u64>() };
-      &buf[index]
-  }
+    type Output = u64;
+    fn index(&self, index: usize) -> &Self::Output {
+        let (_, buf, _) = unsafe { self.mmap.align_to::<u64>() };
+        &buf[index]
+    }
+}
+
+impl Clone for Database {
+    fn clone(&self) -> Self {
+      let next = Database::open(self.path.clone()).expect("while opening file for database clone");
+      next
+    }
 }
