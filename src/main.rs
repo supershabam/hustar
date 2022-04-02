@@ -1,6 +1,3 @@
-mod encoding;
-mod window;
-
 mod accumulator;
 mod mmap;
 mod traverse;
