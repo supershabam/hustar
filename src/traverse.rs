@@ -4,6 +4,24 @@
 use core::f64::consts::PI;
 use itertools::Itertools;
 
+fn bits_to_seq(bits: u64, bitsize: usize) -> String {
+  let mut bits = bits;
+  let mut seq = "".to_string();
+  for _ in 0..bitsize {
+      let tail = bits & 0b11;
+      bits = bits >> 2;
+      let s = match tail {
+          0b00 => "a",
+          0b01 => "c",
+          0b10 => "g",
+          0b11 => "t",
+          _ => panic!("impossible tail"),
+      };
+      seq.push_str(s);
+  }
+  seq.chars().rev().collect::<String>()
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Point {
     pub x: i32,
@@ -114,6 +132,15 @@ impl Point {
     pub fn index_range(&self) -> (usize, usize) {
         let (t1, t2) = self.thetas();
         (self.index(t1), self.index(t2))
+    }
+
+    pub fn seq_range(&self) -> (String, String) {
+      use crate::database::index_to_seq;
+
+      let (t1, t2) = self.thetas();
+      let idx1 = self.index(t1);
+      let idx2 = self.index(t2);
+      (index_to_seq(idx1), index_to_seq(idx2))
     }
 
     fn index(&self, theta: f64) -> usize {

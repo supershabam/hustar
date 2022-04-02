@@ -32,6 +32,36 @@ fn seq_to_index(seq: &str) -> usize {
     idx
 }
 
+fn bits_to_seq(bits: u64, bitsize: usize) -> String {
+  let mut bits = bits;
+  let mut seq = "".to_string();
+  for _ in 0..bitsize {
+      let tail = bits & 0b11;
+      bits = bits >> 2;
+      let s = match tail {
+          0b00 => "a",
+          0b01 => "c",
+          0b10 => "g",
+          0b11 => "t",
+          _ => panic!("impossible tail"),
+      };
+      seq.push_str(s);
+  }
+  seq.chars().rev().collect::<String>()
+}
+
+pub fn index_to_seq(index: usize) -> String {
+  let base = 4_usize;
+  let mut offset = 0;
+  let mut seqlen = 1;
+  while index > offset + base.pow(seqlen) - 1{
+    offset = offset + base.pow(seqlen);
+    seqlen = seqlen+1;
+  }
+  let addr = index - offset;
+  bits_to_seq(addr as u64, seqlen as usize)
+}
+
 fn seq_to_addr(seq: &str) -> usize {
     let mut b: u64 = 0;
     for l in seq.chars() {
@@ -132,4 +162,19 @@ impl Clone for Database {
       let next = Database::open(self.path.clone()).expect("while opening file for database clone");
       next
     }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn test_index_seq_index() {
+    for index in 0..255 {
+      let seq = index_to_seq(index);
+      println!("index={index} seq={seq}");
+      let indexc = seq_to_index(&seq);
+      assert_eq!(index, indexc);
+    }
+  }
 }

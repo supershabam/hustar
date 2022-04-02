@@ -458,7 +458,8 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     (c, lt - gte),
                     p.seqlen,
                 );
-                // println!("sending point={:?} range=({}, {}) val={:?}", p, gte, lt, val);
+                let (gtes, lts) = p.seq_range();
+                println!("sending point={:?} range=({}, {}) range=({}, {}) val={:?}", p, gte, lt, gtes, lts, val);
                 tx.send(val).unwrap();
             }
             // let seqrange = make_coords_to_seq_range(width as usize, height as usize, seqlen);
