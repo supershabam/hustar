@@ -154,6 +154,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             maxesbuf[y * height + x] = maxes[seqlen];
         }
     }
+    println!("maxes {:?}", maxes);
     println!("creating image buffer");
     let mut img = ImageBuffer::from_fn(width as u32, height as u32, |x, y| {
         let x = x as usize;
