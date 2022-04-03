@@ -205,7 +205,6 @@ mod test {
         let p = Point {
             x: 0,
             y: 0,
-            seqlen: 0,
             ..Point::default()
         };
         assert_eq!((0.0, PI / 2.0), p.thetas());
@@ -213,7 +212,6 @@ mod test {
         let p = Point {
             x: -1,
             y: 0,
-            seqlen: 0,
             ..Point::default()
         };
         assert_eq!((PI / 2.0, PI), p.thetas());
@@ -221,7 +219,6 @@ mod test {
         let p = Point {
             x: 0,
             y: -1,
-            seqlen: 0,
             ..Point::default()
         };
         assert_eq!((3.0 / 4.0 * 2.0 * PI, 2.0 * PI), p.thetas());
