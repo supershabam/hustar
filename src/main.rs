@@ -96,7 +96,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let height = side_length;
 
     let pixels = make_points(width as u32, height as u32, seqlen as u32);
-    let (work_tx, work_rx) = bounded(0);
+    let (work_tx, work_rx) = bounded(thread_count);
     thread::spawn(move || {
         let num_chunks = thread_count * 8;
         for chunk_id in 0..num_chunks {
