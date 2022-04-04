@@ -15,7 +15,14 @@ impl Accumulator {
   // and then is requested to move to [9,25).
   pub fn sum_to(&mut self, mmap: &Database, gte: usize, lt: usize) -> u64 {
     use std::cmp::Ordering;
-    
+
+    if gte > self.lt || lt < self.gte {
+      println!("resetting");
+      self.sum = 0;
+      self.gte = gte;
+      self.lt = gte;
+    }
+
     loop {
       match self.lt.cmp(&lt) {
         Ordering::Less => {
@@ -66,6 +73,8 @@ mod test {
     let c = a.sum_to(&mmap, 2, 3);
     println!("count = {c}");
     let c = a.sum_to(&mmap, 1, 2);
+    println!("count = {c}");
+    let c = a.sum_to(&mmap, 4, 12);
     println!("count = {c}");
     Ok(())
   }
