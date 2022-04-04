@@ -117,7 +117,6 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
         let work_rx = work_rx.clone();
         thread::spawn(move || {
             for pixels in work_rx {
-                // println!("received chunk on worker_id={worker_id} with len={}", pixels.len());
                 let mut acc = Accumulator::default();
                 for p in pixels {
                     let (gte, lt) = p.index_range();
@@ -125,7 +124,6 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
                     tx.send(val).unwrap();
                 }
-                // println!("done chunk on worker_id={worker_id}");
             }
         });
     }

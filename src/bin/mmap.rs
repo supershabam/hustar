@@ -3,9 +3,9 @@ use anyhow::Result;
 mod database;
 
 fn main() -> Result<()> {
-    let mut db = database::DatabaseMut::create("./ping.bin", 4)?;
+    let mut db = database::DatabaseMut::create("./test.bin", 4)?;
     db["accg"] += 25;
-    let db = database::Database::open("./ping.bin")?;
+    let db = database::Database::open("./test.bin")?;
     println!("{}", db["accg"]);
     Ok(())
 }
