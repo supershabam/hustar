@@ -251,7 +251,10 @@ fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Resu
     let fasta_file = fasta_file.to_owned();
     let cpus = num_cpus::get();
 
-    info!("building index from fasta_file={} seqlen={} with cpus={}", fasta_file, seqlen, cpus);
+    info!(
+        "building index from fasta_file={} seqlen={} with cpus={}",
+        fasta_file, seqlen, cpus
+    );
 
     let mut db = database::DatabaseMut::create(outpath, seqlen)?;
 
@@ -260,20 +263,21 @@ fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Resu
     info!("done reading record ids");
     let (tx, rx) = unbounded();
     let (tx_sequences, rx_sequences) = bounded(0);
-    for record_id in record_ids {
-        for seqlen in 1..=seqlen {
+    for seqlen in 1..=seqlen {
+        for record_id in &record_ids {
             let val = (record_id.clone(), seqlen);
             info!("sending {:?}", val);
             tx.send(val)?;
         }
     }
-    for _ in 0..cpus-1 {
+    for _ in 0..cpus - 1 {
         let rx = rx.clone();
         let fasta_file = fasta_file.clone();
         let tx_sequences = tx_sequences.clone();
         thread::spawn(move || {
             for (record_id, seqlen) in rx {
-                read_into(&fasta_file, &record_id, seqlen, &tx_sequences).expect("while reading into");
+                read_into(&fasta_file, &record_id, seqlen, &tx_sequences)
+                    .expect("while reading into");
             }
         });
     }
