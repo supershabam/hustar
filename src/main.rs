@@ -4,6 +4,8 @@ mod traverse;
 
 use anyhow::Result;
 use bio::io::fasta::Reader;
+use crossbeam::channel::bounded;
+use crossbeam::channel::unbounded;
 use image::ImageBuffer;
 
 use std::path::PathBuf;
@@ -205,41 +207,86 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     Ok(())
 }
 
-fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Result<()> {
-    let mut b = database::DatabaseMut::create(outpath, seqlen)?;
-    for seqlen in 1..=seqlen {
-        info!("handling seqlen={}", seqlen);
-        let r = Reader::from_file(fasta_file).unwrap();
-        let mut records = r.records();
-        while let Some(Ok(record)) = records.next() {
-            if record.id() != "CM000667.2" {
-                continue;
-            }
-            let t0 = Instant::now();
-            println!("inserting sequences from {}", record.id());
-            let log_modulus = 1_000_000;
-            let i = record.seq().windows(seqlen).filter(filter_n);
-            for (count, elem) in i.enumerate() {
-                let str = String::from_utf8(elem.to_vec())?;
-                b[str.as_str()] += 1;
-                if count % log_modulus == 0 {
-                    println!(
-                        "inserted {} elements elapsed={:.02}s",
-                        count,
-                        t0.elapsed().as_secs_f64()
-                    );
-                }
-            }
-            println!(
-                "inserted all records for {} elapsed={:.2}s",
-                record.id(),
-                t0.elapsed().as_secs_f64(),
-            );
+use crossbeam::channel::Sender;
+
+fn read_into<'a>(
+    fasta_file: &'a str,
+    record_id: &str,
+    seqlen: usize,
+    into: &Sender<String>,
+) -> Result<()> {
+    info!(
+        "reading file={} with record_id={} with seqlen={}",
+        fasta_file, record_id, seqlen
+    );
+    let r = Reader::from_file(fasta_file)?;
+    let mut records = r.records();
+    while let Some(Ok(record)) = records.next() {
+        if record.id() != record_id {
+            continue;
+        }
+        for seq in record.seq().windows(seqlen).filter(filter_n) {
+            let seq = String::from_utf8(seq.to_vec())?;
+            into.send(seq)?;
         }
     }
-    let t0 = Instant::now();
-    // println!("writing to disk {}!", outpath);
-    // serialize(&b, outpath);
-    println!("wrote to disk in {:.2}s", t0.elapsed().as_secs_f64());
+    info!(
+        "done reading file={} with record_id={} with seqlen={}",
+        fasta_file, record_id, seqlen
+    );
+    Ok(())
+}
+
+fn record_ids(fasta_file: &str) -> Result<Vec<String>> {
+    let mut result = Vec::new();
+    let r = Reader::from_file(fasta_file)?;
+    let mut records = r.records();
+    while let Some(Ok(record)) = records.next() {
+        result.push(record.id().to_string());
+    }
+    Ok(result)
+}
+
+fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Result<()> {
+    let fasta_file = fasta_file.to_owned();
+    let cpus = num_cpus::get();
+
+    info!("building index from fasta_file={} seqlen={} with cpus={}", fasta_file, seqlen, cpus);
+
+    let mut db = database::DatabaseMut::create(outpath, seqlen)?;
+
+    info!("reading record ids");
+    let record_ids = record_ids(&fasta_file)?;
+    info!("done reading record ids");
+    let (tx, rx) = unbounded();
+    let (tx_sequences, rx_sequences) = bounded(0);
+    for record_id in record_ids {
+        for seqlen in 1..=seqlen {
+            let val = (record_id.clone(), seqlen);
+            info!("sending {:?}", val);
+            tx.send(val)?;
+        }
+    }
+    for _ in 0..cpus-1 {
+        let rx = rx.clone();
+        let fasta_file = fasta_file.clone();
+        let tx_sequences = tx_sequences.clone();
+        thread::spawn(move || {
+            for (record_id, seqlen) in rx {
+                read_into(&fasta_file, &record_id, seqlen, &tx_sequences).expect("while reading into");
+            }
+        });
+    }
+    drop(tx_sequences);
+    let mut counter = 0;
+    let mut last = Instant::now();
+    for seq in rx_sequences {
+        db[&seq[..]] += 1;
+        counter += 1;
+        if last.elapsed() > Duration::from_secs_f64(1.0) {
+            info!("inserted count={} sequences", counter);
+            last = Instant::now();
+        }
+    }
     Ok(())
 }
