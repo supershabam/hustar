@@ -1,6 +1,6 @@
 mod accumulator;
-mod traverse;
 mod database;
+mod traverse;
 
 use anyhow::Result;
 use bio::io::fasta::Reader;
@@ -85,7 +85,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
 
     let cpus = num_cpus::get();
     let thread_count = cpus;
-    let thread_count = 1;
+    // let thread_count = 1;
 
     println!("printing {} with thread_count={}", index_file, thread_count);
     // let size = buf_size_bytes(seqlen);
@@ -100,20 +100,22 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
 
     let (tx, rx) = channel();
     for worker_id in 0..thread_count {
+        use crate::traverse::filter_points;
+        use crate::traverse::Point;
+
         let tx = tx.clone();
         let m = m.clone();
-        let pixels = pixels.clone();
+        let pixels: Vec<Point> = pixels
+            .iter()
+            .filter(|&p| filter_points(thread_count, worker_id, p))
+            .cloned()
+            .collect();
         thread::spawn(move || {
             for p in pixels {
                 let mut acc = Accumulator::default();
                 let (gte, lt) = p.index_range();
                 let c = acc.sum_to(&m, gte, lt);
-                let val = (
-                    p.w as usize,
-                    p.h as usize,
-                    (c, lt - gte),
-                    p.seqlen,
-                );
+                let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
                 let (gtes, lts) = p.seq_range();
                 // println!("sending point={:?} range=({}, {}) range=({}, {}) val={:?}", p, gte, lt, gtes, lts, val);
                 tx.send(val).unwrap();

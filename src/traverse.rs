@@ -1,8 +1,15 @@
 // traverse helps to iterate the mmap in a minimally querying way
 // to populate a desired set of pixel points.
 
-use core::f64::consts::PI;
+use core::{f64::consts::PI, num};
 use itertools::Itertools;
+
+pub fn filter_points(num_workers: usize, worker_id: usize, point: &Point) -> bool {
+    let (theta, _) = point.thetas();
+    let percentage = (theta / (2.0 * PI)).max(0.0).min(1.0);
+    let work = (percentage * num_workers as f64) as usize;
+    worker_id == work % num_workers
+}
 
 fn bits_to_seq(bits: u64, bitsize: usize) -> String {
     let mut bits = bits;
@@ -134,7 +141,7 @@ impl Point {
         let idx1 = self.index(t1);
         let mut idx2 = self.index(t2);
         if idx2 == idx1 {
-          idx2 = idx2 + 1;
+            idx2 = idx2 + 1;
         }
         (idx1, idx2)
     }
@@ -265,52 +272,52 @@ mod test {
 
     #[test]
     fn test_sequences() {
-      let p = Point {
-          x: 0,
-          y: 0,
-          seqlen: 1,
-          ..Point::default()
-      };
-      assert_eq!(("a".to_string(), "c".to_string()), p.seq_range());
+        let p = Point {
+            x: 0,
+            y: 0,
+            seqlen: 1,
+            ..Point::default()
+        };
+        assert_eq!(("a".to_string(), "c".to_string()), p.seq_range());
 
-      let p = Point {
-          x: 0,
-          y: 0,
-          seqlen: 2,
-          ..Point::default()
-      };
-      assert_eq!(("aa".to_string(), "ca".to_string()), p.seq_range());
+        let p = Point {
+            x: 0,
+            y: 0,
+            seqlen: 2,
+            ..Point::default()
+        };
+        assert_eq!(("aa".to_string(), "ca".to_string()), p.seq_range());
 
-      let p = Point {
-          x: -1,
-          y: 0,
-          seqlen: 2,
-          ..Point::default()
-      };
-      assert_eq!(("ca".to_string(), "ga".to_string()), p.seq_range());
+        let p = Point {
+            x: -1,
+            y: 0,
+            seqlen: 2,
+            ..Point::default()
+        };
+        assert_eq!(("ca".to_string(), "ga".to_string()), p.seq_range());
 
-      let p = Point {
-          x: 0,
-          y: 0,
-          seqlen: 3,
-          ..Point::default()
-      };
-      assert_eq!(("aaa".to_string(), "caa".to_string()), p.seq_range());
+        let p = Point {
+            x: 0,
+            y: 0,
+            seqlen: 3,
+            ..Point::default()
+        };
+        assert_eq!(("aaa".to_string(), "caa".to_string()), p.seq_range());
 
-      let p = Point {
-          x: -1,
-          y: 0,
-          seqlen: 3,
-          ..Point::default()
-      };
-      assert_eq!(("caa".to_string(), "gaa".to_string()), p.seq_range());
+        let p = Point {
+            x: -1,
+            y: 0,
+            seqlen: 3,
+            ..Point::default()
+        };
+        assert_eq!(("caa".to_string(), "gaa".to_string()), p.seq_range());
 
-      let p = Point {
-          x: 127,
-          y: -8,
-          seqlen: 4,
-          ..Point::default()
-      };
-      assert_eq!(("tttc".to_string(), "tttg".to_string()), p.seq_range());
-  }
+        let p = Point {
+            x: 127,
+            y: -8,
+            seqlen: 4,
+            ..Point::default()
+        };
+        assert_eq!(("tttc".to_string(), "tttg".to_string()), p.seq_range());
+    }
 }
