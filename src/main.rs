@@ -111,8 +111,8 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             .cloned()
             .collect();
         thread::spawn(move || {
+            let mut acc = Accumulator::default();
             for p in pixels {
-                let mut acc = Accumulator::default();
                 let (gte, lt) = p.index_range();
                 let c = acc.sum_to(&m, gte, lt);
                 let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
