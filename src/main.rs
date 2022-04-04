@@ -7,6 +7,7 @@ use bio::io::fasta::Reader;
 use image::ImageBuffer;
 
 use std::path::PathBuf;
+use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 use std::{str, thread, time};
@@ -84,7 +85,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     use crate::database::Database;
     use crate::traverse::filter_points;
     use crate::traverse::Point;
-    use crossbeam::channel::bounded;
+    use crossbeam::channel::unbounded;
 
     let cpus = num_cpus::get();
     let thread_count = cpus;
@@ -96,27 +97,28 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let height = side_length;
 
     let pixels = make_points(width as u32, height as u32, seqlen as u32);
-    let (work_tx, work_rx) = bounded(thread_count);
+    let (work_tx, work_rx) = unbounded();
     thread::spawn(move || {
-        let num_chunks = thread_count * 8;
+        let num_chunks = thread_count * 3;
         for chunk_id in 0..num_chunks {
             let pixels: Vec<Point> = pixels
                 .iter()
                 .filter(|&p| filter_points(num_chunks, chunk_id, p))
                 .cloned()
                 .collect();
-            // let len = pixels.len();
+            let len = pixels.len();
             work_tx.send(pixels).expect("while sending chunk of pixels");
             // println!("sent chunk_id={chunk_id} of num_chunks={num_chunks} with len={}", len);
         }
     });
-    let (tx, rx) = channel();
-    for _ in 0..thread_count {
+    let (tx, rx) = channel::<(usize, usize, (u64, usize), usize)>();
+    for worker_id in 0..thread_count {
         let tx = tx.clone();
         let m = m.clone();
         let work_rx = work_rx.clone();
         thread::spawn(move || {
             for pixels in work_rx {
+                // println!("received chunk on worker_id={worker_id} with len={}", pixels.len());
                 let mut acc = Accumulator::default();
                 for p in pixels {
                     let (gte, lt) = p.index_range();
@@ -124,6 +126,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
                     tx.send(val).unwrap();
                 }
+                // println!("done chunk on worker_id={worker_id}");
             }
         });
     }
