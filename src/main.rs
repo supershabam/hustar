@@ -83,12 +83,14 @@ fn main() {
 
 fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     use crate::database::Database;
-    use crate::traverse::filter_points;
+    use crate::traverse::point_chunk_id;
     use crate::traverse::Point;
     use crossbeam::channel::unbounded;
+    use std::collections::BTreeMap;
 
     let cpus = num_cpus::get();
     let thread_count = cpus;
+    let num_chunks = thread_count * 3;
 
     println!("printing {} with thread_count={}", index_file, thread_count);
     let m = Database::open(index_file)?;
@@ -97,18 +99,15 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let height = side_length;
 
     let pixels = make_points(width as u32, height as u32, seqlen as u32);
+    let mut chunk_pixels: BTreeMap<usize, Vec<Point>> = BTreeMap::new();
+    for pixel in pixels {
+        let chunk_id = point_chunk_id(num_chunks, &pixel);
+        chunk_pixels.entry(chunk_id).or_insert_with(|| Vec::new()).push(pixel);
+    }
     let (work_tx, work_rx) = unbounded();
     thread::spawn(move || {
-        let num_chunks = thread_count * 3;
-        for chunk_id in 0..num_chunks {
-            let pixels: Vec<Point> = pixels
-                .iter()
-                .filter(|&p| filter_points(num_chunks, chunk_id, p))
-                .cloned()
-                .collect();
-            let len = pixels.len();
+        for (_, pixels) in chunk_pixels {
             work_tx.send(pixels).expect("while sending chunk of pixels");
-            // println!("sent chunk_id={chunk_id} of num_chunks={num_chunks} with len={}", len);
         }
     });
     let (tx, rx) = channel::<(usize, usize, (u64, usize), usize)>();
