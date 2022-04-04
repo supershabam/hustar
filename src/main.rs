@@ -11,6 +11,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 use std::{str, thread, time};
+use tracing::info;
 
 use clap::{Parser, Subcommand};
 use std::sync::mpsc::channel;
@@ -61,6 +62,7 @@ fn filter_n(seq: &&[u8]) -> bool {
 }
 
 fn main() {
+    tracing_subscriber::fmt::init();
     let args = Cli::parse();
     match &args.command {
         Commands::Build {
@@ -92,18 +94,26 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let thread_count = cpus;
     let num_chunks = thread_count * 3;
 
-    println!("printing {} with thread_count={}", index_file, thread_count);
+    info!("printing {} with thread_count={}", index_file, thread_count);
+
+    info!("opening database");
     let m = Database::open(index_file)?;
+    info!("done opening database");
 
     let width = side_length;
     let height = side_length;
 
+    info!("generating pixels");
     let pixels = make_points(width as u32, height as u32, seqlen as u32);
     let mut chunk_pixels: BTreeMap<usize, Vec<Point>> = BTreeMap::new();
     for pixel in pixels {
         let chunk_id = point_chunk_id(num_chunks, &pixel);
-        chunk_pixels.entry(chunk_id).or_insert_with(|| Vec::new()).push(pixel);
+        chunk_pixels
+            .entry(chunk_id)
+            .or_insert_with(|| Vec::new())
+            .push(pixel);
     }
+    info!("done generating pixels");
     let (work_tx, work_rx) = unbounded();
     thread::spawn(move || {
         for (_, pixels) in chunk_pixels {
@@ -116,6 +126,8 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
         let m = m.clone();
         let work_rx = work_rx.clone();
         thread::spawn(move || {
+            let mut pixel_counter = 0;
+            info!("spawned thread worker_id={}", worker_id);
             for pixels in work_rx {
                 let mut acc = Accumulator::default();
                 for p in pixels {
@@ -123,15 +135,18 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     let c = acc.sum_to(&m, gte, lt);
                     let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
                     tx.send(val).unwrap();
+                    pixel_counter += 1;
                 }
             }
+            info!(
+                "thread exiting worker_id={} processed pixel_counter={}",
+                worker_id, pixel_counter
+            );
         });
     }
-    println!("creating image");
     let mut buf: Vec<u64> = vec![0; width * height];
     let mut maxes: Vec<u64> = vec![0; seqlen + 1];
     let mut maxesbuf: Vec<u64> = vec![0; width * height];
-    println!("creating count buffer");
     drop(tx);
     let mut last = Instant::now();
     let mut counter = 0;
@@ -148,21 +163,21 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             last = now;
             let total = width * height;
             let percentage = counter as f64 / total as f64 * 100.0;
-            println!(
+            info!(
                 "processed {} pixels of {} ({:.2}%)",
                 counter, total, percentage
             );
         }
     }
-    println!("visited {} sequences", count_sequences);
-    println!("creating maxes buffer");
+    info!("visited {} sequences", count_sequences);
+    info!("creating maxes buffer");
     for y in 0..height {
         for x in 0..width {
             maxesbuf[y * height + x] = maxes[seqlen];
         }
     }
-    println!("maxes {:?}", maxes);
-    println!("creating image buffer");
+    info!("maxes {:?}", maxes);
+    info!("creating image buffer");
     let mut img = ImageBuffer::from_fn(width as u32, height as u32, |x, y| {
         let x = x as usize;
         let y = y as usize;
