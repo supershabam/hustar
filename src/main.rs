@@ -115,7 +115,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     p.seqlen,
                 );
                 let (gtes, lts) = p.seq_range();
-                println!("sending point={:?} range=({}, {}) range=({}, {}) val={:?}", p, gte, lt, gtes, lts, val);
+                // println!("sending point={:?} range=({}, {}) range=({}, {}) val={:?}", p, gte, lt, gtes, lts, val);
                 tx.send(val).unwrap();
             }
         });
