@@ -92,7 +92,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
 
     let cpus = num_cpus::get();
     let thread_count = cpus;
-    let num_chunks = thread_count * 3;
+    let num_chunks = thread_count * 8;
 
     info!("printing {} with thread_count={}", index_file, thread_count);
 
