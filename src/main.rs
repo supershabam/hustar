@@ -82,43 +82,48 @@ fn main() {
 
 fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     use crate::database::Database;
+    use crate::traverse::filter_points;
+    use crate::traverse::Point;
+    use crossbeam::channel::bounded;
 
     let cpus = num_cpus::get();
     let thread_count = cpus;
-    // let thread_count = 1;
 
     println!("printing {} with thread_count={}", index_file, thread_count);
-    // let size = buf_size_bytes(seqlen);
     let m = Database::open(index_file)?;
 
     let width = side_length;
     let height = side_length;
 
     let pixels = make_points(width as u32, height as u32, seqlen as u32);
-    let chunk_size = pixels.len() / thread_count;
-    let chunks = pixels.chunks(chunk_size);
-
+    let (work_tx, work_rx) = bounded(0);
+    thread::spawn(move || {
+        let num_chunks = thread_count * 8;
+        for chunk_id in 0..num_chunks {
+            let pixels: Vec<Point> = pixels
+                .iter()
+                .filter(|&p| filter_points(num_chunks, chunk_id, p))
+                .cloned()
+                .collect();
+            // let len = pixels.len();
+            work_tx.send(pixels).expect("while sending chunk of pixels");
+            // println!("sent chunk_id={chunk_id} of num_chunks={num_chunks} with len={}", len);
+        }
+    });
     let (tx, rx) = channel();
-    for worker_id in 0..thread_count {
-        use crate::traverse::filter_points;
-        use crate::traverse::Point;
-
+    for _ in 0..thread_count {
         let tx = tx.clone();
         let m = m.clone();
-        let pixels: Vec<Point> = pixels
-            .iter()
-            .filter(|&p| filter_points(thread_count, worker_id, p))
-            .cloned()
-            .collect();
+        let work_rx = work_rx.clone();
         thread::spawn(move || {
-            let mut acc = Accumulator::default();
-            for p in pixels {
-                let (gte, lt) = p.index_range();
-                let c = acc.sum_to(&m, gte, lt);
-                let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
-                let (gtes, lts) = p.seq_range();
-                // println!("sending point={:?} range=({}, {}) range=({}, {}) val={:?}", p, gte, lt, gtes, lts, val);
-                tx.send(val).unwrap();
+            for pixels in work_rx {
+                let mut acc = Accumulator::default();
+                for p in pixels {
+                    let (gte, lt) = p.index_range();
+                    let c = acc.sum_to(&m, gte, lt);
+                    let val = (p.w as usize, p.h as usize, (c, lt - gte), p.seqlen);
+                    tx.send(val).unwrap();
+                }
             }
         });
     }

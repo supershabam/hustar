@@ -17,7 +17,6 @@ impl Accumulator {
     use std::cmp::Ordering;
 
     if gte > self.lt || lt < self.gte {
-      println!("resetting");
       self.sum = 0;
       self.gte = gte;
       self.lt = gte;
