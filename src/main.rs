@@ -94,7 +94,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let thread_count = cpus;
     let num_chunks = thread_count * 8;
 
-    info!("printing {} with thread_count={}", index_file, thread_count);
+    info!("printing {} with thread_count={} num_chunks={}", index_file, thread_count, num_chunks);
 
     info!("opening database");
     let m = Database::open(index_file)?;
@@ -113,6 +113,9 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
             .or_insert_with(|| Vec::new())
             .push(pixel);
     }
+    for (chunk_id, pixels) in &chunk_pixels {
+        info!("chunk_id={} num_pixels={}", chunk_id, pixels.len());
+    }
     info!("done generating pixels");
     let (work_tx, work_rx) = unbounded();
     thread::spawn(move || {
@@ -127,6 +130,7 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
         let work_rx = work_rx.clone();
         thread::spawn(move || {
             let mut pixel_counter = 0;
+            let mut chunk_counter = 0;
             info!("spawned thread worker_id={}", worker_id);
             for pixels in work_rx {
                 let mut acc = Accumulator::default();
@@ -137,10 +141,15 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
                     tx.send(val).unwrap();
                     pixel_counter += 1;
                 }
+                chunk_counter += 1;
+                info!(
+                    "worker_id={} finished chunk chunk_counter={}",
+                    worker_id, chunk_counter
+                );
             }
             info!(
-                "thread exiting worker_id={} processed pixel_counter={}",
-                worker_id, pixel_counter
+                "thread exiting worker_id={} processed pixel_counter={} chunk_counter={}",
+                worker_id, pixel_counter, chunk_counter
             );
         });
     }

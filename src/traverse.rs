@@ -14,7 +14,7 @@ pub fn filter_points(num_workers: usize, worker_id: usize, point: &Point) -> boo
 pub fn point_chunk_id(num_chunks: usize, point: &Point) -> usize {
   let (theta, _) = point.thetas();
   let percentage = (theta / (2.0 * PI)).max(0.0).min(1.0);
-  let chunk_id = (percentage * num_chunks as f64) as usize & num_chunks;
+  let chunk_id = (percentage * num_chunks as f64) as usize % num_chunks;
   chunk_id
 }
 
