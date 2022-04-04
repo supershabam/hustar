@@ -94,7 +94,10 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
     let thread_count = cpus;
     let num_chunks = thread_count * 8;
 
-    info!("printing {} with thread_count={} num_chunks={}", index_file, thread_count, num_chunks);
+    info!(
+        "printing {} with thread_count={} num_chunks={}",
+        index_file, thread_count, num_chunks
+    );
 
     info!("opening database");
     let m = Database::open(index_file)?;
@@ -203,35 +206,36 @@ fn print(index_file: &str, seqlen: usize, side_length: usize) -> Result<()> {
 }
 
 fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Result<()> {
-    use crate::database;
-
     let mut b = database::DatabaseMut::create(outpath, seqlen)?;
-    let r = Reader::from_file(fasta_file).unwrap();
-    let mut records = r.records();
-    while let Some(Ok(record)) = records.next() {
-        if record.id() != "CM000667.2" {
-            continue;
-        }
-        let t0 = Instant::now();
-        println!("inserting sequences from {}", record.id());
-        let log_modulus = 1_000_000;
-        let i = record.seq().windows(seqlen).filter(filter_n);
-        for (count, elem) in i.enumerate() {
-            let str = String::from_utf8(elem.to_vec())?;
-            b[str.as_str()] += 1;
-            if count % log_modulus == 0 {
-                println!(
-                    "inserted {} elements elapsed={:.02}s",
-                    count,
-                    t0.elapsed().as_secs_f64()
-                );
+    for seqlen in 1..=seqlen {
+        info!("handling seqlen={}", seqlen);
+        let r = Reader::from_file(fasta_file).unwrap();
+        let mut records = r.records();
+        while let Some(Ok(record)) = records.next() {
+            if record.id() != "CM000667.2" {
+                continue;
             }
+            let t0 = Instant::now();
+            println!("inserting sequences from {}", record.id());
+            let log_modulus = 1_000_000;
+            let i = record.seq().windows(seqlen).filter(filter_n);
+            for (count, elem) in i.enumerate() {
+                let str = String::from_utf8(elem.to_vec())?;
+                b[str.as_str()] += 1;
+                if count % log_modulus == 0 {
+                    println!(
+                        "inserted {} elements elapsed={:.02}s",
+                        count,
+                        t0.elapsed().as_secs_f64()
+                    );
+                }
+            }
+            println!(
+                "inserted all records for {} elapsed={:.2}s",
+                record.id(),
+                t0.elapsed().as_secs_f64(),
+            );
         }
-        println!(
-            "inserted all records for {} elapsed={:.2}s",
-            record.id(),
-            t0.elapsed().as_secs_f64(),
-        );
     }
     let t0 = Instant::now();
     // println!("writing to disk {}!", outpath);
