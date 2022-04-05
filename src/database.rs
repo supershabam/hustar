@@ -97,7 +97,7 @@ impl DatabaseMut {
 }
 
 impl Index<&str> for DatabaseMut {
-    type Output = u32;
+    type Output = u64;
     fn index(&self, seq: &str) -> &Self::Output {
         let index = seq_to_index(seq);
         &self[index]
@@ -112,16 +112,16 @@ impl IndexMut<&str> for DatabaseMut {
 }
 
 impl Index<usize> for DatabaseMut {
-    type Output = u32;
+    type Output = u64;
     fn index(&self, index: usize) -> &Self::Output {
-        let (_, buf, _) = unsafe { self.mmap.align_to::<u32>() };
+        let (_, buf, _) = unsafe { self.mmap.align_to::<u64>() };
         &buf[index]
     }
 }
 
 impl IndexMut<usize> for DatabaseMut {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        let (_, buf, _) = unsafe { self.mmap.align_to_mut::<u32>() };
+        let (_, buf, _) = unsafe { self.mmap.align_to_mut::<u64>() };
         &mut buf[index]
     }
 }
@@ -142,7 +142,7 @@ impl Database {
 }
 
 impl Index<&str> for Database {
-    type Output = u32;
+    type Output = u64;
     fn index(&self, seq: &str) -> &Self::Output {
         let index = seq_to_index(seq);
         &self[index]
@@ -150,9 +150,9 @@ impl Index<&str> for Database {
 }
 
 impl Index<usize> for Database {
-    type Output = u32;
+    type Output = u64;
     fn index(&self, index: usize) -> &Self::Output {
-        let (_, buf, _) = unsafe { self.mmap.align_to::<u32>() };
+        let (_, buf, _) = unsafe { self.mmap.align_to::<u64>() };
         &buf[index]
     }
 }
