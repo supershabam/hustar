@@ -282,7 +282,7 @@ fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Resu
         });
     }
     drop(tx_sequences);
-    let mut counter = 0;
+    let mut counter: u64 = 0;
     let mut last = Instant::now();
     for seq in rx_sequences {
         db[&seq[..]] += 1;
