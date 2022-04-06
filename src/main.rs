@@ -270,15 +270,18 @@ fn create<P: Into<PathBuf>>(fasta_file: &str, outpath: P, seqlen: usize) -> Resu
             tx.send(val)?;
         }
     }
-    for _ in 0..cpus - 1 {
+    drop(tx);
+    for worker_id in 0..cpus - 1 {
         let rx = rx.clone();
         let fasta_file = fasta_file.clone();
         let tx_sequences = tx_sequences.clone();
         thread::spawn(move || {
+            info!("worker_id={} starting", worker_id);
             for (record_id, seqlen) in rx {
                 read_into(&fasta_file, &record_id, seqlen, &tx_sequences)
                     .expect("while reading into");
             }
+            info!("worker_id={} exiting", worker_id);
         });
     }
     drop(tx_sequences);
